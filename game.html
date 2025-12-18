@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Downhill Sleigh</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+<style>
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: #0b1d2a;
+    overflow: hidden;
+    font-family: system-ui, sans-serif;
+    touch-action: none;
+  }
+  canvas {
+    display: block;
+    margin: auto;
+    background: linear-gradient(#1c3b5a, #ffffff);
+  }
+</style>
+</head>
+<body>
+
+<canvas id="game"></canvas>
+
+<script>
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+
+function resize() {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+}
+window.addEventListener("resize", resize);
+resize();
+
+/* ---------- GAME STATE ---------- */
+let gameState = "title";
+let score = 0;
+let speed = 4;
+let worldY = 0;
+
+/* ---------- INPUT ---------- */
+const keys = {};
+let touchLeft = false;
+let touchRight = false;
+
+window.addEventListener("keydown", e => keys[e.key] = true);
+window.addEventListener("keyup", e => keys[e.key] = false);
+
+canvas.addEventListener("touchstart", e => {
+  for (let t of e.touches) {
+    if (t.clientX < canvas.width / 2) touchLeft = true;
+    else touchRight = true;
+  }
+});
+canvas.addEventListener("touchend", () => {
+  touchLeft = false;
+  touchRight = false;
+});
+
+canvas.addEventListener("click", () => {
+  if (gameState !== "playing") startGame();
+});
+
+/* ---------- PLAYER ---------- */
+const player = {
+  x: canvas.width / 2,
+  y: canvas.height * 0.72,
+  vx: 0
+};
+
+/* ---------- OBJECTS ---------- */
+let trees = [];
+let gifts = [];
+let billboards = [];
+
+function rand(min, max) {
+  return Math.random() * (max - min) + min;
+}
+
+/* ---------- BILLBOARD IMAGES ---------- */
+const billboardImages = [];
+const images = ["jelly-of-the-month.jpg","buddy.jpg","diehard.jpg","killed-santa.jpg","shitter.jpg"];
+
+images.forEach( i => {
+	const img = new Image();
+	img.src = `images/${i}`;
+	billboardImages.push(img);
+});
+
+/* ---------- RESET ---------- */
+function startGame() {
+  gameState = "playing";
+  score = 0;
+  speed = 4;
+  worldY = 0;
+  trees = [];
+  gifts = [];
+  billboards = [];
+  player.x = canvas.width / 2;
+  player.vx = 0;
+}
+
+/* ---------- SPACING CHECK ---------- */
+function tooClose(y, list, minDist) {
+  return list.some(o => Math.abs(o.y - y) < minDist);
+}
+
+/* ---------- SPAWN ---------- */
+function spawnObjects() {
+
+  // Trees (allowed to cluster)
+  if (Math.random() < 0.035) {
+    trees.push({
+      x: rand(canvas.width * 0.22, canvas.width * 0.78),
+      y: -100
+    });
+  }
+
+  // Gifts (avoid overlapping gifts + billboards)
+  if (Math.random() < 0.03) {
+    const y = -80;
+    if (!tooClose(y, gifts, 80) && !tooClose(y, billboards, 140)) {
+      gifts.push({
+        x: rand(canvas.width * 0.26, canvas.width * 0.74),
+        y,
+        color: `hsl(${rand(0,360)},70%,60%)`
+      });
+    }
+  }
+
+  // Billboards (avoid each other)
+  if (Math.random() < 0.01) {
+    const y = -200;
+    if (!tooClose(y, billboards, 240)) {
+      billboards.push({
+        side: Math.random() < 0.5 ? "left" : "right",
+        y,
+        image: billboardImages.length
+          ? billboardImages[Math.floor(Math.random() * billboardImages.length)]
+          : null
+      });
+    }
+  }
+}
+
+/* ---------- DRAW PLAYER ---------- */
+function drawPlayer() {
+  const x = player.x;
+  const y = player.y;
+
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(0.05);
+
+  // Sled base
+  ctx.fillStyle = "#7a3a1d";
+  ctx.beginPath();
+  ctx.roundRect(-36, 18, 72, 10, 6);
+  ctx.fill();
+
+  // Runners
+  ctx.strokeStyle = "#4a1f0f";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(-28, 26);
+  ctx.lineTo(-28, 40);
+  ctx.moveTo(28, 26);
+  ctx.lineTo(28, 40);
+  ctx.stroke();
+
+  // Body
+  ctx.fillStyle = "#c0392b";
+  ctx.beginPath();
+  ctx.ellipse(0, 0, 16, 22, -0.2, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Legs
+  ctx.fillStyle = "#333";
+  ctx.fillRect(-12, 16, 8, 12);
+  ctx.fillRect(4, 16, 8, 12);
+
+  // Head
+  ctx.fillStyle = "#f1c27d";
+  ctx.beginPath();
+  ctx.arc(0, -28, 10, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Hat
+  ctx.fillStyle = "#b22222";
+  ctx.beginPath();
+  ctx.moveTo(-12, -32);
+  ctx.lineTo(12, -32);
+  ctx.lineTo(0, -48);
+  ctx.closePath();
+  ctx.fill();
+
+  // Scarf (two tails)
+  ctx.strokeStyle = "#f1c40f";
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(8, -6);
+  ctx.lineTo(30 + Math.sin(worldY * 0.1) * 6, 6);
+  ctx.moveTo(6, -4);
+  ctx.lineTo(20 + Math.cos(worldY * 0.1) * 4, 14);
+  ctx.stroke();
+
+  ctx.restore();
+}
+
+/* ---------- DRAW OBJECTS ---------- */
+function drawTree(t) {
+  ctx.fillStyle = "#6b3e26";
+  ctx.fillRect(t.x - 10, t.y + 50, 20, 50);
+
+  ctx.fillStyle = "#1e7f3b";
+  ctx.beginPath();
+  ctx.moveTo(t.x, t.y);
+  ctx.lineTo(t.x - 44, t.y + 70);
+  ctx.lineTo(t.x + 44, t.y + 70);
+  ctx.closePath();
+  ctx.fill();
+}
+
+function drawGift(g) {
+  ctx.fillStyle = g.color;
+  ctx.fillRect(g.x - 16, g.y - 16, 32, 32);
+  ctx.strokeStyle = "#fff";
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(g.x, g.y - 16);
+  ctx.lineTo(g.x, g.y + 16);
+  ctx.moveTo(g.x - 16, g.y);
+  ctx.lineTo(g.x + 16, g.y);
+  ctx.stroke();
+}
+
+function drawBillboard(b) {
+  const signW = 250;
+  const signH = 150;
+  const postH = 75;
+  const x = b.side === "left" ? 125 : canvas.width - 125;
+
+  ctx.fillStyle = "#8b5a2b";
+  ctx.fillRect(x - 50, b.y + signH, 12, postH);
+  ctx.fillRect(x + 38, b.y + signH, 12, postH);
+
+  ctx.fillRect(x - 50, b.y + signH - 10, 100, 10);
+
+  ctx.fillStyle = "#deb887";
+  ctx.fillRect(x - signW / 2, b.y, signW, signH);
+
+  if (b.image) {
+    ctx.drawImage(b.image, x - signW / 2 + 6, b.y + 6, signW - 12, signH - 12);
+  }
+}
+
+/* ---------- COLLISION ---------- */
+function hit(a, bx, by, r) {
+  const dx = a.x - bx;
+  const dy = a.y - by;
+  return Math.sqrt(dx*dx + dy*dy) < r;
+}
+
+/* ---------- UPDATE ---------- */
+function update() {
+  if (gameState !== "playing") return;
+
+  worldY += speed;
+  speed += 0.0006;
+
+  if (keys["ArrowLeft"] || touchLeft) player.vx -= 0.8;
+  if (keys["ArrowRight"] || touchRight) player.vx += 0.8;
+
+  player.vx *= 0.86;
+  player.x += player.vx;
+  player.x = Math.max(100, Math.min(canvas.width - 100, player.x));
+
+  spawnObjects();
+
+  trees.forEach(t => t.y += speed);
+  gifts.forEach(g => g.y += speed);
+  billboards.forEach(b => b.y += speed);
+
+  for (let t of trees) {
+    if (hit(player, t.x, t.y + 70, 42)) gameState = "gameover";
+  }
+
+  for (let i = gifts.length - 1; i >= 0; i--) {
+    if (hit(player, gifts[i].x, gifts[i].y, 28)) {
+      score++;
+      gifts.splice(i, 1);
+    }
+  }
+}
+
+/* ---------- UI ---------- */
+function drawUI() {
+  ctx.fillStyle = "#000";
+  ctx.font = "22px sans-serif";
+  ctx.fillText("Presents: " + score, 20, 32);
+
+  if (gameState === "title") {
+    ctx.font = "42px sans-serif";
+    ctx.fillText("Downhill Sleigh", canvas.width/2 - 160, canvas.height/2 - 90);
+
+    ctx.font = "20px sans-serif";
+    ctx.fillText("Collect presents 🎁", canvas.width/2 - 100, canvas.height/2 - 20);
+    ctx.fillText("Avoid trees 🌲", canvas.width/2 - 90, canvas.height/2 + 10);
+    ctx.fillText("Tap left / right to steer", canvas.width/2 - 140, canvas.height/2 + 50);
+    ctx.fillText("Tap to start", canvas.width/2 - 60, canvas.height/2 + 90);
+
+    ctx.font = "14px sans-serif";
+    ctx.fillText("Made with love for Christmas ❤️", canvas.width/2 - 120, canvas.height - 40);
+  }
+
+  if (gameState === "gameover") {
+    ctx.font = "42px sans-serif";
+    ctx.fillText("CRASH!", canvas.width/2 - 90, canvas.height/2 - 30);
+    ctx.font = "20px sans-serif";
+    ctx.fillText("Presents collected: " + score, canvas.width/2 - 120, canvas.height/2 + 10);
+    ctx.fillText("Tap to try again", canvas.width/2 - 90, canvas.height/2 + 50);
+  }
+}
+
+/* ---------- LOOP ---------- */
+function loop() {
+  update();
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  trees.forEach(drawTree);
+  gifts.forEach(drawGift);
+  billboards.forEach(drawBillboard);
+  if (gameState !== "title") drawPlayer();
+  drawUI();
+  requestAnimationFrame(loop);
+}
+loop();
+</script>
+
+</body>
+</html>
