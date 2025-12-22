@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Merry Christmas</title>
+
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;700&family=Montserrat:wght@300;400&display=swap" rel="stylesheet">
+
+<style>
+  * {
+    box-sizing: border-box;
+  }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    min-height: 100%;
+    background: linear-gradient(180deg, #0b1d2a, #122b3a);
+    font-family: 'Montserrat', sans-serif;
+    color: #f4f4f4;
+  }
+
+  body {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+
+  .card {
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 20px;
+    max-width: 700px;
+    width: 100%;
+    padding: 40px 30px 50px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+    backdrop-filter: blur(6px);
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .card::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at top, rgba(255,255,255,0.15), transparent 60%);
+    pointer-events: none;
+  }
+
+  h1 {
+    font-family: 'Playfair Display', serif;
+    font-size: 2.5rem;
+    margin-bottom: 10px;
+    letter-spacing: 1px;
+  }
+
+  .subtitle {
+    font-size: 1.1rem;
+    opacity: 0.85;
+    margin-bottom: 30px;
+  }
+
+  .message {
+    font-size: 1.05rem;
+    line-height: 1.7;
+    white-space: pre-line;
+    margin: 0 auto;
+    max-width: 540px;
+  }
+
+  .signature {
+    margin-top: 35px;
+    font-style: italic;
+    opacity: 0.9;
+  }
+
+  .snowflake {
+    position: absolute;
+    top: -10px;
+    color: rgba(255,255,255,0.8);
+    font-size: 1em;
+    animation: fall linear infinite;
+    user-select: none;
+    pointer-events: none;
+  }
+
+  @keyframes fall {
+    to {
+      transform: translateY(110vh);
+    }
+  }
+</style>
+</head>
+<body>
+
+<div class="card">
+  <h1>Merry Christmas</h1>
+  <div class="subtitle">and warm wishes this season</div>
+
+  <div class="message">
+	Merry Christmas Dad and Terri,
+
+	I wish I could be there this Christmas Day,
+	but I wanted to send something made with care.
+	Though life has carried me a different way,
+	please know my thoughts still find you there.
+
+	Thank you for being part of my life,
+	for all the time we’ve shared along the way.
+	I hope this season brings you warmth and light,
+	with quiet moments day by day.
+
+	Give Teddy a pat as he races by,
+	while new roads stretch out, both near and far.
+	May the grill stay hot as the days drift by,
+	and every mile feel worth where you are.
+  </div>
+
+  <div class="signature">
+    With love,<br />
+    Jac
+  </div>
+</div>
+
+<script>
+  const snowflakes = 40;
+
+  for (let i = 0; i < snowflakes; i++) {
+    const flake = document.createElement("div");
+    flake.className = "snowflake";
+    flake.textContent = "❄";
+    flake.style.left = Math.random() * 100 + "vw";
+    flake.style.animationDuration = 6 + Math.random() * 8 + "s";
+    flake.style.fontSize = 12 + Math.random() * 16 + "px";
+    flake.style.opacity = Math.random();
+    document.body.appendChild(flake);
+  }
+</script>
+
+</body>
+</html>
