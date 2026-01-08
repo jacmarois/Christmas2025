@@ -2,21 +2,25 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Viewport setting crucial for mobile -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Friendsmas Slots</title>
     <style>
         :root {
             --bg-color: #050505;
             --machine-bg: #2c3e50;
-            --bonus-bg: #154360; /* Sheet music blue */
+            --bonus-bg: #004e66;
             --gold: #f1c40f;
             --red: #c0392b;
             --green: #27ae60;
             --blue: #3498db;
             --text: #ecf0f1;
             
-            --symbol-size: 90px;
-            --reel-width: 100px;
+            /* RESPONSIVE GEOMETRY */
+            /* On desktop: 100px. On mobile: 17% of screen width (fits 5 reels + gaps) */
+            --reel-width: clamp(50px, 17vw, 110px);
+            --symbol-size: clamp(45px, 15vw, 100px); 
+            
             --visible-rows: 3;
             --window-height: calc(var(--symbol-size) * var(--visible-rows));
         }
@@ -24,7 +28,7 @@
         body {
             background-color: var(--bg-color);
             color: var(--text);
-            font-family: 'Segoe UI', sans-serif;
+            font-family: 'Segoe UI', system-ui, sans-serif;
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -34,20 +38,24 @@
             user-select: none;
             overflow: hidden;
             transition: background-color 0.5s;
+            /* Prevent pull-to-refresh on mobile */
+            overscroll-behavior: none;
         }
 
         /* --- JACKPOT TICKER --- */
         .jackpot-container {
             text-align: center;
-            margin-bottom: 25px;
+            margin-bottom: 15px;
             animation: pulse 3s infinite ease-in-out;
             background: linear-gradient(180deg, #222, #000);
-            padding: 10px 40px;
+            padding: 8px 20px;
             border-radius: 50px;
             border: 2px solid #333;
             transition: all 0.5s;
             position: relative;
             z-index: 10;
+            width: 80%;
+            max-width: 400px;
         }
         
         .jackpot-container.hot {
@@ -56,9 +64,9 @@
             box-shadow: 0 0 30px #e74c3c;
         }
 
-        .jackpot-label { font-size: 0.8rem; color: #aaa; letter-spacing: 4px; font-weight: bold; text-transform: uppercase; }
+        .jackpot-label { font-size: 0.7rem; color: #aaa; letter-spacing: 2px; font-weight: bold; text-transform: uppercase; }
         .jackpot-amount { 
-            font-size: 3rem; 
+            font-size: 2rem; 
             color: var(--gold); 
             font-weight: 900; 
             text-shadow: 0 0 25px rgba(241, 196, 15, 0.6);
@@ -73,16 +81,20 @@
         /* --- MACHINE --- */
         .machine-frame {
             background: var(--machine-bg);
-            padding: 25px;
-            border-radius: 20px;
+            padding: 15px;
+            border-radius: 15px;
             border: 4px solid #555;
-            box-shadow: 0 30px 80px rgba(0,0,0,1);
+            box-shadow: 0 20px 50px rgba(0,0,0,1);
             display: flex;
             flex-direction: column;
-            gap: 15px;
+            gap: 10px;
             position: relative;
             z-index: 10;
             transition: background 0.5s, border-color 0.5s;
+            /* Fit to screen on mobile */
+            width: 95vw;
+            max-width: 600px;
+            box-sizing: border-box;
         }
 
         .machine-frame.bonus-mode {
@@ -96,27 +108,28 @@
             display: flex;
             justify-content: space-between;
             background: #000;
-            padding: 10px 15px;
+            padding: 8px 10px;
             border-radius: 8px;
             border: 1px solid #333;
             font-family: 'Courier New', monospace;
         }
-        .hud-box { display: flex; flex-direction: column; align-items: center; min-width: 80px; }
-        .label { font-size: 0.7rem; color: #666; text-transform: uppercase; }
-        .value { font-size: 1.2rem; color: #fff; font-weight: bold; }
+        .hud-box { display: flex; flex-direction: column; align-items: center; min-width: 60px; }
+        .label { font-size: 0.6rem; color: #666; text-transform: uppercase; }
+        .value { font-size: 1rem; color: #fff; font-weight: bold; }
         .value.win { color: var(--green); }
 
         /* --- REELS AREA --- */
         .game-window {
             position: relative;
             background: #000;
-            border: 5px solid #111;
+            border: 4px solid #111;
             display: flex;
-            gap: 4px;
-            padding: 4px;
+            justify-content: space-between; /* Distribute reels evenly */
+            padding: 2px;
             border-radius: 6px;
             height: var(--window-height);
-            box-shadow: inset 0 0 50px rgba(0,0,0,0.8);
+            box-shadow: inset 0 0 30px rgba(0,0,0,0.8);
+            overflow: hidden;
         }
 
         .payline-overlay {
@@ -140,17 +153,20 @@
             flex-direction: column;
             align-items: center;
             will-change: transform;
+            width: 100%;
         }
 
         .symbol {
-            width: var(--reel-width);
+            width: 100%; /* Fill the reel width */
             height: var(--symbol-size);
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 3.5rem;
+            /* Dynamic Font Size based on container */
+            font-size: calc(var(--symbol-size) * 0.7); 
             box-sizing: border-box;
             border-bottom: 1px solid rgba(0,0,0,0.1);
+            user-select: none;
         }
 
         .symbol img {
@@ -167,16 +183,20 @@
             height: 30px;
             line-height: 30px;
             font-weight: bold;
-            font-size: 1.1rem;
+            font-size: 0.9rem;
             border-radius: 4px;
             text-transform: uppercase;
             letter-spacing: 1px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         /* --- CONTROLS --- */
         .controls {
             display: flex;
-            gap: 10px;
+            gap: 5px;
+            width: 100%;
         }
 
         button {
@@ -186,21 +206,23 @@
             cursor: pointer;
             text-transform: uppercase;
             color: white;
-            box-shadow: 0 5px 0 rgba(0,0,0,0.3);
+            box-shadow: 0 4px 0 rgba(0,0,0,0.3);
             transition: transform 0.1s;
+            /* Prevent double-tap zoom on mobile */
+            touch-action: manipulation; 
         }
         button:active { transform: translateY(4px); box-shadow: none; }
         button:disabled { background: #444 !important; box-shadow: none; transform: translateY(4px); cursor: not-allowed; opacity: 0.5; }
 
-        .btn-aux { padding: 10px 10px; font-size: 0.8rem; background: #555; flex-grow: 1; }
+        .btn-aux { padding: 12px 5px; font-size: 0.7rem; background: #555; flex-grow: 1; }
         .btn-spin {
-            flex-grow: 3;
+            flex-grow: 4;
             background: var(--green);
-            font-size: 1.6rem;
-            padding: 15px;
-            box-shadow: 0 6px 0 #1e8449;
+            font-size: 1.4rem;
+            padding: 12px;
+            box-shadow: 0 5px 0 #1e8449;
         }
-        .btn-active { background: var(--blue) !important; box-shadow: 0 5px 0 #2980b9 !important;}
+        .btn-active { background: var(--blue) !important; box-shadow: 0 4px 0 #2980b9 !important;}
 
         /* --- MODALS --- */
         .modal-overlay {
@@ -214,12 +236,12 @@
         .modal-box {
             background: #fff;
             color: #222;
-            padding: 25px;
+            padding: 20px;
             border-radius: 10px;
-            width: 90%;
+            width: 85%;
             max-width: 500px;
             text-align: center;
-            max-height: 85vh;
+            max-height: 90vh;
             overflow-y: auto;
         }
         
@@ -228,35 +250,37 @@
             align-items: center;
             border-bottom: 1px solid #eee;
             padding: 8px 0;
-            font-size: 0.85rem;
+            font-size: 0.8rem;
             justify-content: space-between;
         }
-        .pay-icon { font-size: 2.5rem; width: 50px; }
+        .pay-icon { font-size: 2rem; width: 40px; }
         .pay-col { text-align: center; width: 30%; }
-        .pay-header { font-weight: bold; color:#888; margin-bottom: 4px; font-size: 0.7rem;}
-        .pay-val { color: #c0392b; font-weight: bold; font-size: 1.1rem; }
+        .pay-header { font-weight: bold; color:#888; margin-bottom: 4px; font-size: 0.6rem;}
+        .pay-val { color: #c0392b; font-weight: bold; font-size: 1rem; }
 
         /* --- OVERLAYS --- */
         .fullscreen-msg {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.9);
+            background: rgba(0,0,0,0.95);
             z-index: 2000;
             display: none;
             flex-direction: column;
             align-items: center;
             justify-content: center;
             animation: fadeIn 0.5s;
-        }
-        .fullscreen-msg h1 {
-            font-size: 4rem; color: var(--gold);
-            text-shadow: 0 0 30px var(--red);
-            margin: 0;
+            padding: 20px;
             text-align: center;
         }
-        .big-icon { font-size: 8rem; animation: bounce 1s infinite; }
+        .fullscreen-msg h1 {
+            font-size: 3rem; color: var(--gold);
+            text-shadow: 0 0 30px var(--red);
+            margin: 0;
+        }
+        .big-icon { font-size: 6rem; animation: bounce 1s infinite; }
         .btn-large {
-            padding: 15px 40px; font-size: 1.5rem; margin-top: 30px;
+            padding: 15px 40px; font-size: 1.2rem; margin-top: 20px;
             background: var(--green); color: white; border-radius: 50px;
+            width: 80%;
         }
 
         @keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-30px); } }
@@ -265,8 +289,16 @@
         .shaking { animation: shake 0.5s infinite; }
         @keyframes shake { 0% { transform: translate(1px, 1px); } 50% { transform: translate(-1px, -2px); } 100% { transform: translate(1px, -1px); } }
 
-        .blur { filter: blur(5px); }
+        .blur { filter: blur(3px); }
         canvas { position: fixed; top: 0; left: 0; pointer-events: none; z-index: 900; }
+
+        /* --- DESKTOP ADJUSTMENTS --- */
+        @media (min-width: 600px) {
+            .machine-frame { padding: 30px; gap: 20px; }
+            .btn-spin { font-size: 1.8rem; }
+            .jackpot-amount { font-size: 3rem; }
+            .msg-bar { font-size: 1.2rem; }
+        }
 
     </style>
 </head>
@@ -278,7 +310,7 @@
     <div id="jackpot-overlay" class="fullscreen-msg">
         <div class="big-icon">🏆</div>
         <h1>JACKPOT!</h1>
-        <h2 id="jackpot-win-amount" style="color:white; font-family:monospace; font-size: 3rem;">$50,000</h2>
+        <h2 id="jackpot-win-amount" style="color:white; font-family:monospace; font-size: 2.5rem;">$50,000</h2>
         <button class="btn-large" onclick="closeJackpotScreen()">COLLECT</button>
     </div>
 
@@ -356,18 +388,18 @@
             
             <div class="pay-row" style="background:#eee;">
                 <div class="pay-icon"></div>
-                <div class="pay-col pay-header">MATCH 3</div>
-                <div class="pay-col pay-header">MATCH 4</div>
-                <div class="pay-col pay-header">MATCH 5</div>
+                <div class="pay-col pay-header">3x</div>
+                <div class="pay-col pay-header">4x</div>
+                <div class="pay-col pay-header">5x</div>
             </div>
             <div id="paytable-content"></div>
             
-            <div style="margin-top:15px; background:#d4e6f1; padding:10px; border-radius:8px; border:1px solid #3498db; font-size: 0.9rem;">
+            <div style="margin-top:15px; background:#d4e6f1; padding:10px; border-radius:8px; border:1px solid #3498db; font-size: 0.8rem;">
                 <strong>🛷 FREE SPINS 🛷</strong><br>
                 Land 3 Sleighs ANYWHERE to win 10 Free Spins!
             </div>
 
-            <div style="margin-top:10px; background:#f9e79f; padding:10px; border-radius:8px; border:1px solid #f1c40f; font-size: 0.9rem;">
+            <div style="margin-top:10px; background:#f9e79f; padding:10px; border-radius:8px; border:1px solid #f1c40f; font-size: 0.8rem;">
                 <strong>🏆 JACKPOT 🏆</strong><br>
                 Hot over $10k. Land 🏆 on Reels 2, 3, & 4.
             </div>
@@ -378,6 +410,9 @@
     </div>
 
     <script>
+        // ==========================================
+        //  AUDIO SYSTEM
+        // ==========================================
         const AudioContext = window.AudioContext || window.webkitAudioContext;
         let audioCtx;
 
@@ -386,7 +421,6 @@
             if(audioCtx.state === 'suspended') audioCtx.resume();
         }
 
-        // --- MUSIC ENGINE (ACCURATE TRANSCRIPTION) ---
         const MusicEngine = {
             interval: null,
             noteIndex: 0,
@@ -395,7 +429,6 @@
                 if(MusicEngine.isPlaying) return;
                 MusicEngine.isPlaying = true;
                 MusicEngine.noteIndex = 0;
-                // Medium Two Beat (~170ms per 8th note)
                 MusicEngine.interval = setInterval(MusicEngine.tick, 170);
             },
             stop: () => {
@@ -404,91 +437,33 @@
             },
             tick: () => {
                 if(!audioCtx) return;
-                let i = MusicEngine.noteIndex % 64; // 8 bars of 8th notes
-                const dur = 0.14; // Staccato
+                let i = MusicEngine.noteIndex % 64; 
+                const dur = 0.14; 
                 
-                // --- PERCUSSION ---
-                // Sleigh Bells (8th notes)
                 SoundFX.playNoise(0.08);
-                // Woodblock (Quarter notes: 0, 2, 4, 6...)
                 if(i % 2 === 0) SoundFX.playWoodblock();
 
-                // --- MELODY (Key G Major) ---
-                // Frequencies: D5=587, C5=523, B4=493, A4=440, G4=392, F#4=370, E4=330, D4=294
-                
-                let m = 0; // Melody Note
-                let b = 0; // Bass Note
+                // Melody (G Major)
+                let m = 0; let b = 0;
 
-                // MELODY TRANSCRIPTION (Bar by Bar)
-                // Bar 1: "Just hear those sleigh bells" -> D5, D5, D5, (rest), D5, (rest), D5
-                if(i === 0) m = 587; // Just
-                if(i === 1) m = 587; // hear
-                if(i === 2) m = 587; // those
-                if(i === 4) m = 587; // sleigh
-                if(i === 6) m = 587; // bells
+                // Melody Transcription
+                if(i===0) m=587; if(i===1) m=587; if(i===2) m=587; if(i===4) m=587; if(i===6) m=587;
+                if(i===8) m=493; if(i===10) m=440; if(i===12) m=392; if(i===14) m=330;
+                if(i===16) m=370; if(i===17) m=330; if(i===18) m=294; if(i===20) m=493;
+                if(i===24) m=493; if(i===25) m=493; if(i===26) m=493;
+                if(i===28) m=493; if(i===30) m=493; if(i===32) m=392; if(i===34) m=330;
+                if(i===36) m=440; if(i===38) m=392; if(i===40) m=370; if(i===42) m=330;
+                if(i===44) m=294; if(i===45) m=330; if(i===46) m=370; if(i===47) m=392;
+                if(i===48) m=440;
 
-                // Bar 2: "Jin-gling, ring ting" -> B4, (rest), A4, (rest), G4, (rest), E4
-                if(i === 8) m = 493; // jin
-                if(i === 10) m = 440; // gling
-                if(i === 12) m = 392; // ring
-                if(i === 14) m = 330; // ting
+                // Bass
+                if(i>=0 && i<16) { if(i%8===0) b=196; if(i%8===4) b=147; } 
+                if(i>=16 && i<32) { if(i%8===0) b=220; if(i%8===4) b=165; }
+                if(i>=32 && i<48) { if(i%8===0) b=196; if(i%8===4) b=147; }
+                if(i>=48) { if(i%8===0) b=147; if(i%8===4) b=220; }
 
-                // Bar 3: "tin-gle-ling too" -> F#4, E4, D4, (rest), B4...
-                if(i === 16) m = 370; // tin
-                if(i === 17) m = 330; // gle
-                if(i === 18) m = 294; // ling
-                if(i === 20) m = 493; // too
-
-                // Bar 4: "Come on it's" -> B4, B4, B4
-                if(i === 24) m = 493; // Come
-                if(i === 25) m = 493; // on
-                if(i === 26) m = 493; // it's
-
-                // Bar 5: "love-ly weath-er" -> B4, (rest), B4, (rest), G4, (rest), E4
-                if(i === 28) m = 493; // love
-                if(i === 30) m = 493; // ly
-                if(i === 32) m = 392; // weath
-                if(i === 34) m = 330; // er
-
-                // Bar 6: "for a sleigh ride" -> A4, (rest), G4, (rest), F#4, (rest), E4
-                if(i === 36) m = 440; // for
-                if(i === 38) m = 392; // a
-                if(i === 40) m = 370; // sleigh
-                if(i === 42) m = 330; // ride
-
-                // Bar 7: "to-geth-er with" -> D4, E4, F#4, G4
-                if(i === 44) m = 294; // to
-                if(i === 45) m = 330; // geth
-                if(i === 46) m = 370; // er
-                if(i === 47) m = 392; // with
-
-                // Bar 8: "you" -> A4...
-                if(i === 48) m = 440; // you
-
-                // --- BASS LINE (I - vi - ii - V) ---
-                // G -> E -> A -> D
-                // Change root every 2 beats (every 4 ticks)
-                // Pattern: Root, 5th
-                
-                if(i >= 0 && i < 16) { // G Major & Em7
-                    if(i%8 === 0) b = 196; // G3
-                    if(i%8 === 4) b = 147; // D3 (5th)
-                } 
-                if(i >= 16 && i < 32) { // Am7 & D7
-                    if(i%8 === 0) b = 220; // A3
-                    if(i%8 === 4) b = 165; // E3 (5th)
-                }
-                if(i >= 32 && i < 48) { // Repeat G & E
-                    if(i%8 === 0) b = 196; // G3
-                    if(i%8 === 4) b = 147; // D3
-                }
-                 if(i >= 48) { // D7 Turnaround
-                    if(i%8 === 0) b = 147; // D3
-                    if(i%8 === 4) b = 220; // A3
-                }
-
-                if(m > 0) SoundFX.playTone(m, 'square', dur, 0.04);
-                if(b > 0) SoundFX.playTone(b, 'triangle', dur, 0.08);
+                if(m>0) SoundFX.playTone(m, 'square', dur, 0.04);
+                if(b>0) SoundFX.playTone(b, 'triangle', dur, 0.08);
 
                 MusicEngine.noteIndex++;
             }
@@ -587,7 +562,6 @@
         ];
 
         const SPIN_COST = 20;
-        const SYMBOL_SIZE = 90;
         const REELS = 5;
         const ROWS = 3;
 
@@ -633,6 +607,11 @@
             }
             renderPaytable();
             updateUI();
+            
+            // Listen for resize to update lines
+            window.addEventListener('resize', () => {
+                if(showLinesMode) drawGuides();
+            });
         };
 
         function rebuildInnerReels() {
@@ -712,6 +691,10 @@
             
             void strip.offsetWidth; 
             
+            // Dynamic Size Calc
+            const currentSymbolSize = strip.querySelector('.symbol').offsetHeight;
+            const targetY = -(spinLength * currentSymbolSize);
+
             if(reelIdx === 0) {
                 let tickCount = 0;
                 let ticker = setInterval(() => {
@@ -720,7 +703,6 @@
                 }, 100);
             }
 
-            const targetY = -(spinLength * SYMBOL_SIZE);
             const duration = 1.0 + (reelIdx * 0.25);
             
             strip.style.transition = `transform ${duration}s cubic-bezier(0.15, 0.9, 0.35, 1)`;
@@ -892,25 +874,40 @@
             }
         }
 
+        /* --- RESPONSIVE DRAWING LOGIC --- */
+        function getCellDimensions() {
+            const container = document.querySelector('.game-window');
+            // Gap is 2px, but let's just measure the first reel/symbol
+            const firstReel = document.querySelector('.reel');
+            const firstSymbol = document.querySelector('.symbol');
+            if(!firstReel || !firstSymbol) return { w:0, h:0 };
+            return {
+                w: container.clientWidth / REELS, // Approximate column width including gap
+                h: container.clientHeight / ROWS
+            };
+        }
+
         function drawGuides() {
             const svg = document.getElementById('payline-layer');
             let html = "";
-            LINES.forEach(l => html += getPolylineHtml(l, 0.5, l.color, 4)); 
+            const dims = getCellDimensions();
+            LINES.forEach(l => html += getPolylineHtml(l, 0.5, l.color, 4, dims)); 
             svg.innerHTML = html;
         }
 
         function drawWinLines(wins) {
             const svg = document.getElementById('payline-layer');
             let html = "";
-            wins.forEach(w => html += getPolylineHtml(w.line, 1.0, w.line.color, 8));
+            const dims = getCellDimensions();
+            wins.forEach(w => html += getPolylineHtml(w.line, 1.0, w.line.color, 8, dims));
             svg.innerHTML = html;
         }
 
-        function getPolylineHtml(line, opacity, color, width) {
+        function getPolylineHtml(line, opacity, color, width, dims) {
             let points = "";
             line.coords.forEach((r, c) => {
-                let x = (c * 104) + 52;
-                let y = (r * 90) + 45;
+                let x = (c * dims.w) + (dims.w / 2);
+                let y = (r * dims.h) + (dims.h / 2);
                 points += `${x},${y} `;
             });
             return `<polyline points="${points}" fill="none" stroke="${color}" stroke-width="${width}" opacity="${opacity}" stroke-linecap="round" stroke-linejoin="round"/>`;
@@ -947,9 +944,9 @@
                 h += `
                 <div class="pay-row">
                     <div class="pay-icon">${s.img}</div>
-                    <div class="pay-col"><span class="pay-val">$${w3}</span></div>
-                    <div class="pay-col"><span class="pay-val">$${w4}</span></div>
-                    <div class="pay-col"><span class="pay-val">$${w5}</span></div>
+                    <div class="pay-col"><span class="pay-val">${w3}</span></div>
+                    <div class="pay-col"><span class="pay-val">${w4}</span></div>
+                    <div class="pay-col"><span class="pay-val">${w5}</span></div>
                 </div>`;
             });
             c.innerHTML = h;
