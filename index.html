@@ -1,365 +1,985 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<title>Downhill Sleigh</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
-<style>
-  html, body {
-    margin: 0;
-    padding: 0;
-    background: #0b1d2a;
-    overflow: hidden;
-    font-family: system-ui, sans-serif;
-    touch-action: none;
-  }
-  canvas {
-    display: block;
-    margin: auto;
-    background: linear-gradient(#1c3b5a, #ffffff);
-  }
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Friendsmas Slots</title>
+    <style>
+        :root {
+            --bg-color: #050505;
+            --machine-bg: #2c3e50;
+            --bonus-bg: #154360; /* Sheet music blue */
+            --gold: #f1c40f;
+            --red: #c0392b;
+            --green: #27ae60;
+            --blue: #3498db;
+            --text: #ecf0f1;
+            
+            --symbol-size: 90px;
+            --reel-width: 100px;
+            --visible-rows: 3;
+            --window-height: calc(var(--symbol-size) * var(--visible-rows));
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text);
+            font-family: 'Segoe UI', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            user-select: none;
+            overflow: hidden;
+            transition: background-color 0.5s;
+        }
+
+        /* --- JACKPOT TICKER --- */
+        .jackpot-container {
+            text-align: center;
+            margin-bottom: 25px;
+            animation: pulse 3s infinite ease-in-out;
+            background: linear-gradient(180deg, #222, #000);
+            padding: 10px 40px;
+            border-radius: 50px;
+            border: 2px solid #333;
+            transition: all 0.5s;
+            position: relative;
+            z-index: 10;
+        }
+        
+        .jackpot-container.hot {
+            border-color: #e74c3c;
+            background: linear-gradient(180deg, #500, #200);
+            box-shadow: 0 0 30px #e74c3c;
+        }
+
+        .jackpot-label { font-size: 0.8rem; color: #aaa; letter-spacing: 4px; font-weight: bold; text-transform: uppercase; }
+        .jackpot-amount { 
+            font-size: 3rem; 
+            color: var(--gold); 
+            font-weight: 900; 
+            text-shadow: 0 0 25px rgba(241, 196, 15, 0.6);
+            font-family: 'Courier New', monospace;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { text-shadow: 0 0 20px rgba(241, 196, 15, 0.4); border-color: #333;}
+            50% { text-shadow: 0 0 50px rgba(241, 196, 15, 0.9); border-color: var(--gold); }
+        }
+
+        /* --- MACHINE --- */
+        .machine-frame {
+            background: var(--machine-bg);
+            padding: 25px;
+            border-radius: 20px;
+            border: 4px solid #555;
+            box-shadow: 0 30px 80px rgba(0,0,0,1);
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            position: relative;
+            z-index: 10;
+            transition: background 0.5s, border-color 0.5s;
+        }
+
+        .machine-frame.bonus-mode {
+            background: var(--bonus-bg);
+            border-color: #3498db;
+            box-shadow: 0 0 40px #3498db;
+        }
+
+        /* --- HUD --- */
+        .hud {
+            display: flex;
+            justify-content: space-between;
+            background: #000;
+            padding: 10px 15px;
+            border-radius: 8px;
+            border: 1px solid #333;
+            font-family: 'Courier New', monospace;
+        }
+        .hud-box { display: flex; flex-direction: column; align-items: center; min-width: 80px; }
+        .label { font-size: 0.7rem; color: #666; text-transform: uppercase; }
+        .value { font-size: 1.2rem; color: #fff; font-weight: bold; }
+        .value.win { color: var(--green); }
+
+        /* --- REELS AREA --- */
+        .game-window {
+            position: relative;
+            background: #000;
+            border: 5px solid #111;
+            display: flex;
+            gap: 4px;
+            padding: 4px;
+            border-radius: 6px;
+            height: var(--window-height);
+            box-shadow: inset 0 0 50px rgba(0,0,0,0.8);
+        }
+
+        .payline-overlay {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none;
+            z-index: 50;
+        }
+
+        .reel {
+            width: var(--reel-width);
+            height: var(--window-height);
+            background: #f0f0f0;
+            overflow: hidden; 
+            position: relative;
+            border-radius: 2px;
+        }
+
+        .reel-strip {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            will-change: transform;
+        }
+
+        .symbol {
+            width: var(--reel-width);
+            height: var(--symbol-size);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 3.5rem;
+            box-sizing: border-box;
+            border-bottom: 1px solid rgba(0,0,0,0.1);
+        }
+
+        .symbol img {
+            width: 85%; height: 85%;
+            object-fit: contain;
+            filter: drop-shadow(0 4px 2px rgba(0,0,0,0.2));
+        }
+
+        /* --- MESSAGE BAR --- */
+        .msg-bar {
+            background: #111;
+            color: var(--gold);
+            text-align: center;
+            height: 30px;
+            line-height: 30px;
+            font-weight: bold;
+            font-size: 1.1rem;
+            border-radius: 4px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        /* --- CONTROLS --- */
+        .controls {
+            display: flex;
+            gap: 10px;
+        }
+
+        button {
+            border: none;
+            border-radius: 6px;
+            font-weight: 800;
+            cursor: pointer;
+            text-transform: uppercase;
+            color: white;
+            box-shadow: 0 5px 0 rgba(0,0,0,0.3);
+            transition: transform 0.1s;
+        }
+        button:active { transform: translateY(4px); box-shadow: none; }
+        button:disabled { background: #444 !important; box-shadow: none; transform: translateY(4px); cursor: not-allowed; opacity: 0.5; }
+
+        .btn-aux { padding: 10px 10px; font-size: 0.8rem; background: #555; flex-grow: 1; }
+        .btn-spin {
+            flex-grow: 3;
+            background: var(--green);
+            font-size: 1.6rem;
+            padding: 15px;
+            box-shadow: 0 6px 0 #1e8449;
+        }
+        .btn-active { background: var(--blue) !important; box-shadow: 0 5px 0 #2980b9 !important;}
+
+        /* --- MODALS --- */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.9);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+        .modal-box {
+            background: #fff;
+            color: #222;
+            padding: 25px;
+            border-radius: 10px;
+            width: 90%;
+            max-width: 500px;
+            text-align: center;
+            max-height: 85vh;
+            overflow-y: auto;
+        }
+        
+        .pay-row {
+            display: flex;
+            align-items: center;
+            border-bottom: 1px solid #eee;
+            padding: 8px 0;
+            font-size: 0.85rem;
+            justify-content: space-between;
+        }
+        .pay-icon { font-size: 2.5rem; width: 50px; }
+        .pay-col { text-align: center; width: 30%; }
+        .pay-header { font-weight: bold; color:#888; margin-bottom: 4px; font-size: 0.7rem;}
+        .pay-val { color: #c0392b; font-weight: bold; font-size: 1.1rem; }
+
+        /* --- OVERLAYS --- */
+        .fullscreen-msg {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.9);
+            z-index: 2000;
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            animation: fadeIn 0.5s;
+        }
+        .fullscreen-msg h1 {
+            font-size: 4rem; color: var(--gold);
+            text-shadow: 0 0 30px var(--red);
+            margin: 0;
+            text-align: center;
+        }
+        .big-icon { font-size: 8rem; animation: bounce 1s infinite; }
+        .btn-large {
+            padding: 15px 40px; font-size: 1.5rem; margin-top: 30px;
+            background: var(--green); color: white; border-radius: 50px;
+        }
+
+        @keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-30px); } }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        
+        .shaking { animation: shake 0.5s infinite; }
+        @keyframes shake { 0% { transform: translate(1px, 1px); } 50% { transform: translate(-1px, -2px); } 100% { transform: translate(1px, -1px); } }
+
+        .blur { filter: blur(5px); }
+        canvas { position: fixed; top: 0; left: 0; pointer-events: none; z-index: 900; }
+
+    </style>
 </head>
 <body>
 
-<canvas id="game"></canvas>
+    <canvas id="confetti"></canvas>
 
-<script>
-const canvas = document.getElementById("game");
-const ctx = canvas.getContext("2d");
+    <!-- JACKPOT SCREEN -->
+    <div id="jackpot-overlay" class="fullscreen-msg">
+        <div class="big-icon">🏆</div>
+        <h1>JACKPOT!</h1>
+        <h2 id="jackpot-win-amount" style="color:white; font-family:monospace; font-size: 3rem;">$50,000</h2>
+        <button class="btn-large" onclick="closeJackpotScreen()">COLLECT</button>
+    </div>
 
-function resize() {
-  canvas.width = window.innerWidth;
-  canvas.height = window.innerHeight;
-}
-window.addEventListener("resize", resize);
-resize();
+    <!-- BONUS SCREEN -->
+    <div id="bonus-overlay" class="fullscreen-msg" style="background: rgba(0,50,80,0.95);">
+        <div class="big-icon">🛷</div>
+        <h1>FREE SPINS!</h1>
+        <h2 style="color:#3498db;">YOU WON 10 FREE SPINS</h2>
+        <button class="btn-large" style="background:#3498db;" onclick="startFreeSpins()">START</button>
+    </div>
 
-/* ---------- GLOBAL SCALE (MOBILE TUNING) ---------- */
-const SCALE = 0.7;
+    <!-- BONUS END SCREEN -->
+    <div id="bonus-end-overlay" class="fullscreen-msg" style="background: rgba(0,50,80,0.95);">
+        <div class="big-icon">💰</div>
+        <h1>BONUS COMPLETE</h1>
+        <h2 id="bonus-total-win" style="color:white;">Total Win: $0</h2>
+        <button class="btn-large" onclick="endBonusMode()">CONTINUE</button>
+    </div>
 
-/* ---------- GAME STATE ---------- */
-let gameState = "title"; 
-// title | playing | pausedImage | gameover
+    <div class="jackpot-container" id="jackpot-ui">
+        <div class="jackpot-label">FRIENDSMAS JACKPOT</div>
+        <div class="jackpot-amount" id="jackpot-display">$5,000</div>
+    </div>
 
-let score = 0;
-let speed = 4;
-let worldY = 0;
+    <div class="machine-frame" id="machine-frame">
+        <div class="hud">
+            <div class="hud-box">
+                <span class="label">Credits</span>
+                <span class="value" id="ui-balance">$1000</span>
+            </div>
+            <div class="hud-box">
+                <span class="label">Win</span>
+                <span class="value win" id="ui-win">$0</span>
+            </div>
+            <div class="hud-box">
+                <span class="label">Bet</span>
+                <span class="value" id="ui-bet">$20</span>
+            </div>
+        </div>
 
-/* ---------- INPUT ---------- */
-const keys = {};
-let touchLeft = false;
-let touchRight = false;
+        <div class="game-window">
+            <svg class="payline-overlay" id="payline-layer"></svg>
+            <div class="reel"><div class="reel-strip" id="reel-0"></div></div>
+            <div class="reel"><div class="reel-strip" id="reel-1"></div></div>
+            <div class="reel"><div class="reel-strip" id="reel-2"></div></div>
+            <div class="reel"><div class="reel-strip" id="reel-3"></div></div>
+            <div class="reel"><div class="reel-strip" id="reel-4"></div></div>
+        </div>
 
-window.addEventListener("keydown", e => keys[e.key] = true);
-window.addEventListener("keyup", e => keys[e.key] = false);
+        <div class="msg-bar" id="msg-bar">READY TO SPIN</div>
 
-canvas.addEventListener("touchstart", e => {
-  for (let t of e.touches) {
-    if (t.clientX < canvas.width / 2) touchLeft = true;
-    else touchRight = true;
-  }
-});
+        <div class="controls">
+            <button class="btn-aux" id="btn-atm" onclick="openATM()">ATM</button>
+            <button class="btn-aux" id="btn-info" onclick="openPaytable()">INFO</button>
+            <button class="btn-aux" id="btn-lines" onclick="toggleLines()">👁️ LINES</button>
+            <button class="btn-spin" id="btn-spin" onclick="spin()">SPIN</button>
+        </div>
+    </div>
 
-canvas.addEventListener("touchend", () => {
-  touchLeft = false;
-  touchRight = false;
-});
+    <!-- ATM -->
+    <div class="modal-overlay" id="atm-modal">
+        <div class="modal-box">
+            <h2>🏧 Friendsmas Bank</h2>
+            <button class="btn-spin" style="width:100%;" onclick="withdrawCash()">WITHDRAW $1,000</button>
+            <br><br>
+            <button class="btn-aux" style="background:#888;" onclick="closeModal('atm-modal')">CANCEL</button>
+        </div>
+    </div>
 
-canvas.addEventListener("click", () => {
-  if (gameState === "pausedImage") {
-    gameState = "playing";
-    return;
-  }
-  if (gameState !== "playing") startGame();
-});
+    <!-- INFO -->
+    <div class="modal-overlay" id="paytable-modal">
+        <div class="modal-box">
+            <h2>PAYTABLE</h2>
+            <p style="font-size:0.8rem; color:#666; margin-bottom: 10px;">Bet: $20</p>
+            
+            <div class="pay-row" style="background:#eee;">
+                <div class="pay-icon"></div>
+                <div class="pay-col pay-header">MATCH 3</div>
+                <div class="pay-col pay-header">MATCH 4</div>
+                <div class="pay-col pay-header">MATCH 5</div>
+            </div>
+            <div id="paytable-content"></div>
+            
+            <div style="margin-top:15px; background:#d4e6f1; padding:10px; border-radius:8px; border:1px solid #3498db; font-size: 0.9rem;">
+                <strong>🛷 FREE SPINS 🛷</strong><br>
+                Land 3 Sleighs ANYWHERE to win 10 Free Spins!
+            </div>
 
-/* ---------- PLAYER ---------- */
-const player = {
-  x: canvas.width / 2,
-  y: canvas.height * 0.72,
-  vx: 0
-};
+            <div style="margin-top:10px; background:#f9e79f; padding:10px; border-radius:8px; border:1px solid #f1c40f; font-size: 0.9rem;">
+                <strong>🏆 JACKPOT 🏆</strong><br>
+                Hot over $10k. Land 🏆 on Reels 2, 3, & 4.
+            </div>
 
-/* ---------- OBJECTS ---------- */
-let trees = [];
-let gifts = [];
+            <br>
+            <button class="btn-aux" style="background:#e74c3c; color:white;" onclick="closeModal('paytable-modal')">CLOSE</button>
+        </div>
+    </div>
 
-function rand(min, max) {
-  return Math.random() * (max - min) + min;
-}
+    <script>
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        let audioCtx;
 
-/* ---------- IMAGES FOR PAUSE SCREENS ---------- */
-const pauseImages = [];
-const imageFiles = [
-  "jelly-of-the-month.jpg",
-  "buddy.jpg",
-  "diehard.jpg",
-  "killed-santa.jpg",
-  "shitter.jpg"
-];
+        function initAudio() {
+            if(!audioCtx) audioCtx = new AudioContext();
+            if(audioCtx.state === 'suspended') audioCtx.resume();
+        }
 
-imageFiles.forEach(name => {
-  const img = new Image();
-  img.src = `images/${name}`;
-  pauseImages.push(img);
-});
+        // --- MUSIC ENGINE (ACCURATE TRANSCRIPTION) ---
+        const MusicEngine = {
+            interval: null,
+            noteIndex: 0,
+            isPlaying: false,
+            start: () => {
+                if(MusicEngine.isPlaying) return;
+                MusicEngine.isPlaying = true;
+                MusicEngine.noteIndex = 0;
+                // Medium Two Beat (~170ms per 8th note)
+                MusicEngine.interval = setInterval(MusicEngine.tick, 170);
+            },
+            stop: () => {
+                MusicEngine.isPlaying = false;
+                clearInterval(MusicEngine.interval);
+            },
+            tick: () => {
+                if(!audioCtx) return;
+                let i = MusicEngine.noteIndex % 64; // 8 bars of 8th notes
+                const dur = 0.14; // Staccato
+                
+                // --- PERCUSSION ---
+                // Sleigh Bells (8th notes)
+                SoundFX.playNoise(0.08);
+                // Woodblock (Quarter notes: 0, 2, 4, 6...)
+                if(i % 2 === 0) SoundFX.playWoodblock();
 
-let imageIndex = 0;
-let currentPauseImage = null;
+                // --- MELODY (Key G Major) ---
+                // Frequencies: D5=587, C5=523, B4=493, A4=440, G4=392, F#4=370, E4=330, D4=294
+                
+                let m = 0; // Melody Note
+                let b = 0; // Bass Note
 
-/* ---------- RESET ---------- */
-function startGame() {
-  gameState = "playing";
-  score = 0;
-  speed = 4;
-  worldY = 0;
-  trees = [];
-  gifts = [];
-  imageIndex = 0;
-  currentPauseImage = null;
-  player.x = canvas.width / 2;
-  player.vx = 0;
-}
+                // MELODY TRANSCRIPTION (Bar by Bar)
+                // Bar 1: "Just hear those sleigh bells" -> D5, D5, D5, (rest), D5, (rest), D5
+                if(i === 0) m = 587; // Just
+                if(i === 1) m = 587; // hear
+                if(i === 2) m = 587; // those
+                if(i === 4) m = 587; // sleigh
+                if(i === 6) m = 587; // bells
 
-/* ---------- SPAWN ---------- */
-function spawnObjects() {
+                // Bar 2: "Jin-gling, ring ting" -> B4, (rest), A4, (rest), G4, (rest), E4
+                if(i === 8) m = 493; // jin
+                if(i === 10) m = 440; // gling
+                if(i === 12) m = 392; // ring
+                if(i === 14) m = 330; // ting
 
-  // Trees
-  if (Math.random() < 0.035) {
-    trees.push({
-      x: rand(canvas.width * 0.22, canvas.width * 0.78),
-      y: -120
-    });
-  }
+                // Bar 3: "tin-gle-ling too" -> F#4, E4, D4, (rest), B4...
+                if(i === 16) m = 370; // tin
+                if(i === 17) m = 330; // gle
+                if(i === 18) m = 294; // ling
+                if(i === 20) m = 493; // too
 
-  // Gifts
-  if (Math.random() < 0.03) {
-    gifts.push({
-      x: rand(canvas.width * 0.26, canvas.width * 0.74),
-      y: -80,
-      color: `hsl(${rand(0,360)},70%,60%)`
-    });
-  }
-}
+                // Bar 4: "Come on it's" -> B4, B4, B4
+                if(i === 24) m = 493; // Come
+                if(i === 25) m = 493; // on
+                if(i === 26) m = 493; // it's
 
-/* ---------- DRAW PLAYER ---------- */
-function drawPlayer() {
-  ctx.save();
-  ctx.translate(player.x, player.y);
-  ctx.scale(SCALE, SCALE);
-  ctx.rotate(0.05);
+                // Bar 5: "love-ly weath-er" -> B4, (rest), B4, (rest), G4, (rest), E4
+                if(i === 28) m = 493; // love
+                if(i === 30) m = 493; // ly
+                if(i === 32) m = 392; // weath
+                if(i === 34) m = 330; // er
 
-  // Sled
-  ctx.fillStyle = "#7a3a1d";
-  ctx.beginPath();
-  ctx.roundRect(-36, 18, 72, 10, 6);
-  ctx.fill();
+                // Bar 6: "for a sleigh ride" -> A4, (rest), G4, (rest), F#4, (rest), E4
+                if(i === 36) m = 440; // for
+                if(i === 38) m = 392; // a
+                if(i === 40) m = 370; // sleigh
+                if(i === 42) m = 330; // ride
 
-  ctx.strokeStyle = "#4a1f0f";
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(-28, 26);
-  ctx.lineTo(-28, 40);
-  ctx.moveTo(28, 26);
-  ctx.lineTo(28, 40);
-  ctx.stroke();
+                // Bar 7: "to-geth-er with" -> D4, E4, F#4, G4
+                if(i === 44) m = 294; // to
+                if(i === 45) m = 330; // geth
+                if(i === 46) m = 370; // er
+                if(i === 47) m = 392; // with
 
-  // Body
-  ctx.fillStyle = "#c0392b";
-  ctx.beginPath();
-  ctx.ellipse(0, 0, 16, 22, -0.2, 0, Math.PI * 2);
-  ctx.fill();
+                // Bar 8: "you" -> A4...
+                if(i === 48) m = 440; // you
 
-  // Legs
-  ctx.fillStyle = "#333";
-  ctx.fillRect(-12, 16, 8, 12);
-  ctx.fillRect(4, 16, 8, 12);
+                // --- BASS LINE (I - vi - ii - V) ---
+                // G -> E -> A -> D
+                // Change root every 2 beats (every 4 ticks)
+                // Pattern: Root, 5th
+                
+                if(i >= 0 && i < 16) { // G Major & Em7
+                    if(i%8 === 0) b = 196; // G3
+                    if(i%8 === 4) b = 147; // D3 (5th)
+                } 
+                if(i >= 16 && i < 32) { // Am7 & D7
+                    if(i%8 === 0) b = 220; // A3
+                    if(i%8 === 4) b = 165; // E3 (5th)
+                }
+                if(i >= 32 && i < 48) { // Repeat G & E
+                    if(i%8 === 0) b = 196; // G3
+                    if(i%8 === 4) b = 147; // D3
+                }
+                 if(i >= 48) { // D7 Turnaround
+                    if(i%8 === 0) b = 147; // D3
+                    if(i%8 === 4) b = 220; // A3
+                }
 
-  // Head
-  ctx.fillStyle = "#f1c27d";
-  ctx.beginPath();
-  ctx.arc(0, -28, 10, 0, Math.PI * 2);
-  ctx.fill();
+                if(m > 0) SoundFX.playTone(m, 'square', dur, 0.04);
+                if(b > 0) SoundFX.playTone(b, 'triangle', dur, 0.08);
 
-  // Hat
-  ctx.fillStyle = "#b22222";
-  ctx.beginPath();
-  ctx.moveTo(-12, -32);
-  ctx.lineTo(12, -32);
-  ctx.lineTo(0, -48);
-  ctx.closePath();
-  ctx.fill();
+                MusicEngine.noteIndex++;
+            }
+        };
 
-  // Scarf
-  ctx.strokeStyle = "#f1c40f";
-  ctx.lineWidth = 3;
-  ctx.beginPath();
-  ctx.moveTo(8, -6);
-  ctx.lineTo(30 + Math.sin(worldY * 0.1) * 6, 6);
-  ctx.moveTo(6, -4);
-  ctx.lineTo(20 + Math.cos(worldY * 0.1) * 4, 14);
-  ctx.stroke();
+        const SoundFX = {
+            playTone: (freq, type, duration, vol=0.1) => {
+                if(!audioCtx) return;
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = type;
+                osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+                gain.gain.setValueAtTime(0, audioCtx.currentTime);
+                gain.gain.linearRampToValueAtTime(vol, audioCtx.currentTime + 0.02);
+                gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start();
+                osc.stop(audioCtx.currentTime + duration);
+            },
+            playNoise: (duration) => {
+                if(!audioCtx) return;
+                const bufferSize = audioCtx.sampleRate * duration;
+                const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+                const data = buffer.getChannelData(0);
+                for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+                const noise = audioCtx.createBufferSource();
+                noise.buffer = buffer;
+                const gain = audioCtx.createGain();
+                const filter = audioCtx.createBiquadFilter();
+                filter.type = 'highpass';
+                filter.frequency.value = 5000; 
+                gain.gain.setValueAtTime(0.02, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+                noise.connect(filter);
+                filter.connect(gain);
+                gain.connect(audioCtx.destination);
+                noise.start();
+            },
+            playWoodblock: () => {
+                if(!audioCtx) return;
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.frequency.setValueAtTime(800, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(400, audioCtx.currentTime + 0.05);
+                gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.05);
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.05);
+            },
+            spin: () => { SoundFX.playTone(400, 'triangle', 0.05, 0.05); },
+            stop: () => {
+                if(!audioCtx) return;
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.frequency.setValueAtTime(100, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(40, audioCtx.currentTime + 0.15);
+                gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.15);
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.15);
+            },
+            win: () => {
+                const notes = [523.25, 659.25, 783.99, 1046.50];
+                notes.forEach((n, i) => setTimeout(() => SoundFX.playTone(n, 'sine', 0.6, 0.1), i * 100));
+            },
+            bonus: () => {
+                const notes = [523, 659, 783, 1046, 1318, 1567];
+                notes.forEach((n, i) => setTimeout(() => SoundFX.playTone(n, 'sine', 0.8, 0.1), i * 80));
+            },
+            jackpot: () => {
+                const loop = setInterval(() => SoundFX.playTone(880 + Math.random()*400, 'triangle', 0.1, 0.1), 100);
+                setTimeout(() => clearInterval(loop), 2000);
+            },
+            cash: () => {
+                SoundFX.playTone(1200, 'sine', 0.1, 0.1);
+                setTimeout(() => SoundFX.playTone(1600, 'sine', 0.2, 0.1), 100);
+            }
+        };
 
-  ctx.restore();
-}
+        const PAYTABLE = [
+            { id: 'cookie',  img: '🍪', pay: [0.5, 2, 8],    weight: 50 },
+            { id: 'snow',    img: '❄️', pay: [0.5, 2, 8],    weight: 50 },
+            { id: 'tree',    img: '🎄', pay: [0.5, 5, 12],   weight: 40 },
+            { id: 'beer',    img: '🥂', pay: [1, 8, 20],     weight: 30 },
+            { id: 'gift',    img: '🎁', pay: [2, 10, 50],    weight: 20 },
+            { id: 'snowman', img: '⛄', pay: [5, 25, 200],   weight: 12 },
+            { id: 'santa',   img: '🎅', pay: [10, 50, 500],  weight: 6 },
+            { id: 'wild',    img: '🃏', pay: [10, 50, 500],  weight: 6 }, 
+            { id: 'sleigh',  img: '🛷', pay: null,           weight: 8 }, 
+            { id: 'trophy',  img: '🏆', pay: null,           weight: 0 }  
+        ];
 
-/* ---------- DRAW OBJECTS ---------- */
-function drawTree(t) {
-  ctx.save();
-  ctx.translate(t.x, t.y);
-  ctx.scale(SCALE, SCALE);
+        const SPIN_COST = 20;
+        const SYMBOL_SIZE = 90;
+        const REELS = 5;
+        const ROWS = 3;
 
-  // Trunk
-  ctx.fillStyle = "#6b3e26";
-  ctx.fillRect(-10, 50, 20, 50);
+        let credits = 1000;
+        let jackpot = 5000;
+        let isSpinning = false;
+        let freeSpins = 0;
+        let isBonusMode = false;
+        let bonusTotalWin = 0;
 
-  // Foliage
-  ctx.fillStyle = "#1e7f3b";
-  ctx.beginPath();
-  ctx.moveTo(0, 0);
-  ctx.lineTo(-44, 70);
-  ctx.lineTo(44, 70);
-  ctx.closePath();
-  ctx.fill();
+        let reelStrips = [];
+        let resultGrid = []; 
+        let weightedReelOuter = []; 
+        let weightedReelInnerBase = []; 
+        let weightedReelInnerActive = []; 
+        let showLinesMode = false;
 
-  ctx.restore();
-}
+        const LINES = [
+            { name: "Middle",  coords: [1,1,1,1,1], color: '#e74c3c' }, 
+            { name: "Top",     coords: [0,0,0,0,0], color: '#f1c40f' }, 
+            { name: "Bottom",  coords: [2,2,2,2,2], color: '#2ecc71' }, 
+            { name: "V",       coords: [0,1,2,1,0], color: '#3498db' }, 
+            { name: "Hill",    coords: [2,1,0,1,2], color: '#9b59b6' },
+            { name: "Dip",     coords: [0,0,1,2,2], color: '#e67e22' },
+            { name: "Rise",    coords: [2,2,1,0,0], color: '#1abc9c' }
+        ];
 
-function drawGift(g) {
-  ctx.fillStyle = g.color;
-  ctx.fillRect(g.x - 16, g.y - 16, 32, 32);
-  ctx.strokeStyle = "#fff";
-  ctx.lineWidth = 3;
-  ctx.beginPath();
-  ctx.moveTo(g.x, g.y - 16);
-  ctx.lineTo(g.x, g.y + 16);
-  ctx.moveTo(g.x - 16, g.y);
-  ctx.lineTo(g.x + 16, g.y);
-  ctx.stroke();
-}
+        window.onload = () => {
+            PAYTABLE.forEach(sym => {
+                if(sym.id === 'trophy') return; 
+                for(let i=0; i<sym.weight; i++) weightedReelOuter.push(sym);
+                for(let i=0; i<sym.weight; i++) weightedReelInnerBase.push(sym);
+            });
 
-/* ---------- COLLISION ---------- */
-function hit(a, bx, by, r) {
-  const dx = a.x - bx;
-  const dy = a.y - by;
-  return Math.sqrt(dx*dx + dy*dy) < r;
-}
+            for(let i=0; i<REELS; i++) {
+                reelStrips[i] = document.getElementById(`reel-${i}`);
+                let html = "";
+                for(let r=0; r<ROWS; r++) {
+                    let randItem = weightedReelOuter[Math.floor(Math.random()*weightedReelOuter.length)];
+                    html += `<div class="symbol">${randItem.img}</div>`;
+                }
+                reelStrips[i].innerHTML = html;
+            }
+            renderPaytable();
+            updateUI();
+        };
 
-/* ---------- UPDATE ---------- */
-function update() {
-  if (gameState !== "playing") return;
+        function rebuildInnerReels() {
+            weightedReelInnerActive = [...weightedReelInnerBase];
+            const trophy = PAYTABLE.find(s => s.id === 'trophy');
+            let baseTrophies = 3; 
+            if(jackpot > 10000) baseTrophies += Math.floor((jackpot - 10000) / 100);
+            for(let i=0; i<baseTrophies; i++) weightedReelInnerActive.push(trophy);
+        }
 
-  worldY += speed;
-  speed += 0.0006;
+        function getRandomSymbol(reelIndex) {
+            if(reelIndex === 0 || reelIndex === 4) {
+                return weightedReelOuter[Math.floor(Math.random() * weightedReelOuter.length)];
+            } else {
+                return weightedReelInnerActive[Math.floor(Math.random() * weightedReelInnerActive.length)];
+            }
+        }
 
-  if (keys["ArrowLeft"] || touchLeft) player.vx -= 0.8;
-  if (keys["ArrowRight"] || touchRight) player.vx += 0.8;
+        function spin() {
+            if(isSpinning) return;
+            initAudio();
 
-  player.vx *= 0.86;
-  player.x += player.vx;
-  player.x = Math.max(120, Math.min(canvas.width - 120, player.x));
+            if(!isBonusMode) {
+                if(credits < SPIN_COST) {
+                    document.getElementById('msg-bar').innerText = "INSUFFICIENT FUNDS";
+                    openATM();
+                    return;
+                }
+                credits -= SPIN_COST;
+                jackpot += 50;
+            } else {
+                freeSpins--;
+                document.getElementById('btn-spin').innerText = `AUTO (${freeSpins})`;
+            }
 
-  spawnObjects();
+            isSpinning = true;
+            document.getElementById('ui-win').innerText = "$0";
+            updateUI();
+            
+            document.getElementById('payline-layer').innerHTML = '';
+            if(showLinesMode) drawGuides();
 
-  trees.forEach(t => t.y += speed);
-  gifts.forEach(g => g.y += speed);
+            document.getElementById('msg-bar').innerText = isBonusMode ? "FREE SPINNING..." : "SPINNING...";
+            document.getElementById('btn-spin').disabled = true;
 
-  for (let t of trees) {
-    if (hit(player, t.x, t.y + 70 * SCALE, 30 * SCALE)) {
-      gameState = "gameover";
-    }
-  }
+            rebuildInnerReels();
 
-  for (let i = gifts.length - 1; i >= 0; i--) {
-    if (hit(player, gifts[i].x, gifts[i].y, 22)) {
-      score++;
-      gifts.splice(i, 1);
+            resultGrid = [];
+            for(let c=0; c<REELS; c++) {
+                let col = [];
+                for(let r=0; r<ROWS; r++) {
+                    col.push(getRandomSymbol(c));
+                }
+                resultGrid.push(col);
+            }
 
-      if (score % 10 === 0 && pauseImages.length) {
-        currentPauseImage = pauseImages[imageIndex % pauseImages.length];
-        imageIndex++;
-        gameState = "pausedImage";
-      }
-    }
-  }
-}
+            for(let i=0; i<REELS; i++) {
+                animateReel(i, resultGrid[i]);
+            }
+        }
 
-/* ---------- UI ---------- */
-function drawPauseImage() {
-  ctx.fillStyle = "rgba(255,255,255,0.9)";
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
+        function animateReel(reelIdx, finalSymbols) {
+            const strip = reelStrips[reelIdx];
+            const spinLength = 12 + (reelIdx * 3); 
+            
+            let fragment = "";
+            for(let i=0; i<spinLength; i++) {
+                fragment += `<div class="symbol blur">${getRandomSymbol(reelIdx).img}</div>`;
+            }
+            finalSymbols.forEach(s => {
+                fragment += `<div class="symbol">${s.img}</div>`;
+            });
 
-  if (!currentPauseImage) return;
+            strip.innerHTML = fragment;
+            strip.style.transition = 'none';
+            strip.style.transform = 'translateY(0)';
+            
+            void strip.offsetWidth; 
+            
+            if(reelIdx === 0) {
+                let tickCount = 0;
+                let ticker = setInterval(() => {
+                    if(tickCount++ > 10) clearInterval(ticker);
+                    SoundFX.spin();
+                }, 100);
+            }
 
-  const maxW = canvas.width * 0.85;
-  const maxH = canvas.height * 0.6;
-  const scale = Math.min(
-    maxW / currentPauseImage.width,
-    maxH / currentPauseImage.height
-  );
+            const targetY = -(spinLength * SYMBOL_SIZE);
+            const duration = 1.0 + (reelIdx * 0.25);
+            
+            strip.style.transition = `transform ${duration}s cubic-bezier(0.15, 0.9, 0.35, 1)`;
+            strip.style.transform = `translateY(${targetY}px)`;
 
-  const w = currentPauseImage.width * scale;
-  const h = currentPauseImage.height * scale;
+            strip.addEventListener('transitionend', () => {
+                SoundFX.stop(); 
+                let finalHtml = "";
+                finalSymbols.forEach(s => finalHtml += `<div class="symbol">${s.img}</div>`);
+                strip.innerHTML = finalHtml;
+                strip.style.transition = 'none';
+                strip.style.transform = 'translateY(0)';
+                
+                if(reelIdx === REELS - 1) evaluateWin();
+            }, { once: true });
+        }
 
-  ctx.drawImage(
-    currentPauseImage,
-    canvas.width / 2 - w / 2,
-    canvas.height / 2 - h / 2,
-    w,
-    h
-  );
+        function evaluateWin() {
+            let totalWin = 0;
+            let winsToDraw = []; 
+            let triggerBonus = false;
 
-  ctx.fillStyle = "#000";
-  ctx.font = "20px sans-serif";
-  ctx.fillText(
-    "🎁 10 presents delivered — tap to continue",
-    canvas.width / 2 - 170,
-    canvas.height / 2 + h / 2 + 40
-  );
-}
+            let sleighCount = 0;
+            resultGrid.flat().forEach(s => { if(s.id === 'sleigh') sleighCount++; });
+            
+            if(sleighCount >= 3) {
+                if(!isBonusMode) {
+                    triggerBonus = true;
+                } else {
+                    freeSpins += 5;
+                    document.getElementById('msg-bar').innerText = "+5 FREE SPINS!";
+                    SoundFX.bonus();
+                }
+            }
 
-function drawUI() {
-  ctx.fillStyle = "#000";
-  ctx.font = "22px sans-serif";
-  ctx.fillText("Presents: " + score, 20, 32);
+            const hasTrophy1 = resultGrid[1].some(s => s.id === 'trophy');
+            const hasTrophy2 = resultGrid[2].some(s => s.id === 'trophy');
+            const hasTrophy3 = resultGrid[3].some(s => s.id === 'trophy');
+            const hitJackpot = hasTrophy1 && hasTrophy2 && hasTrophy3;
 
-  if (gameState === "title") {
-    ctx.font = "42px sans-serif";
-    ctx.fillText("Downhill Sleigh", canvas.width/2 - 160, canvas.height/2 - 90);
+            if (hitJackpot) {
+                totalWin += jackpot;
+                triggerJackpotSequence(jackpot);
+                jackpot = 5000; 
+            }
 
-    ctx.font = "20px sans-serif";
-    ctx.fillText("Collect presents 🎁", canvas.width/2 - 100, canvas.height/2 - 20);
-    ctx.fillText("Avoid trees 🌲", canvas.width/2 - 90, canvas.height/2 + 10);
-    ctx.fillText("Tap left / right to steer", canvas.width/2 - 140, canvas.height/2 + 50);
-    ctx.fillText("Tap to start", canvas.width/2 - 60, canvas.height/2 + 90);
-  }
+            LINES.forEach(line => {
+                const lineSyms = [];
+                for(let c=0; c<REELS; c++) lineSyms.push(resultGrid[c][line.coords[c]]);
+                let primaryId = null;
+                for(let s of lineSyms) { if(s.id !== 'wild') { primaryId = s.id; break; } }
+                if(!primaryId) primaryId = 'santa'; 
+                if(primaryId === 'trophy' || primaryId === 'sleigh') return;
+                let matchCount = 0;
+                for(let s of lineSyms) {
+                    if(s.id === primaryId || s.id === 'wild') matchCount++;
+                    else break; 
+                }
+                if(matchCount >= 3) {
+                    const payData = PAYTABLE.find(p => p.id === primaryId);
+                    if(payData && payData.pay) {
+                        let multiplier = payData.pay[matchCount-3];
+                        let winVal = SPIN_COST * multiplier;
+                        if(winVal > 0) {
+                            totalWin += winVal;
+                            winsToDraw.push({ line: line, amount: winVal });
+                        }
+                    }
+                }
+            });
 
-  if (gameState === "gameover") {
-    ctx.font = "42px sans-serif";
-    ctx.fillText("CRASH!", canvas.width/2 - 90, canvas.height/2 - 30);
-    ctx.font = "20px sans-serif";
-    ctx.fillText("Presents collected: " + score, canvas.width/2 - 120, canvas.height/2 + 10);
-    ctx.fillText("Tap to try again", canvas.width/2 - 90, canvas.height/2 + 50);
-  }
-}
+            if(totalWin > 0 && !hitJackpot) {
+                SoundFX.win();
+                animateBalance(totalWin);
+                document.getElementById('msg-bar').innerText = `WIN: $${totalWin}`;
+                document.getElementById('msg-bar').style.color = "var(--green)";
+                document.getElementById('payline-layer').innerHTML = ''; 
+                drawWinLines(winsToDraw);
+                fireConfetti(false);
+            } else if (!hitJackpot) {
+                 document.getElementById('msg-bar').innerText = isBonusMode ? "FREE SPINS ACTIVE" : "TRY AGAIN";
+                 document.getElementById('msg-bar').style.color = "#ccc";
+            }
 
-/* ---------- LOOP ---------- */
-function loop() {
-  update();
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
+            if(isBonusMode) bonusTotalWin += totalWin;
 
-  trees.forEach(drawTree);
-  gifts.forEach(drawGift);
+            let unlockDelay = (totalWin > 0 || triggerBonus || hitJackpot) ? 1200 : 200;
 
-  if (gameState !== "title") drawPlayer();
-  if (gameState === "pausedImage") drawPauseImage();
+            setTimeout(() => {
+                isSpinning = false;
+                
+                if(triggerBonus) {
+                    showBonusScreen();
+                    return;
+                }
 
-  drawUI();
-  requestAnimationFrame(loop);
-}
-loop();
-</script>
+                if(isBonusMode) {
+                    if(freeSpins > 0) setTimeout(spin, 1500);
+                    else showBonusEndScreen();
+                } else {
+                    document.getElementById('btn-spin').disabled = false;
+                }
+                updateUI();
+            }, unlockDelay);
+        }
 
+        function showBonusScreen() {
+            SoundFX.bonus();
+            document.getElementById('bonus-overlay').style.display = 'flex';
+        }
+
+        function startFreeSpins() {
+            document.getElementById('bonus-overlay').style.display = 'none';
+            isBonusMode = true;
+            freeSpins = 10;
+            bonusTotalWin = 0;
+            document.getElementById('machine-frame').classList.add('bonus-mode');
+            document.getElementById('btn-spin').innerText = `AUTO (${freeSpins})`;
+            MusicEngine.start(); 
+            setTimeout(spin, 1000);
+        }
+
+        function showBonusEndScreen() {
+            MusicEngine.stop();
+            document.getElementById('bonus-total-win').innerText = `Total Win: $${bonusTotalWin}`;
+            document.getElementById('bonus-end-overlay').style.display = 'flex';
+            SoundFX.bonus();
+        }
+
+        function endBonusMode() {
+            document.getElementById('bonus-end-overlay').style.display = 'none';
+            isBonusMode = false;
+            document.getElementById('machine-frame').classList.remove('bonus-mode');
+            document.getElementById('btn-spin').innerText = "SPIN";
+            document.getElementById('btn-spin').disabled = false;
+            updateUI();
+        }
+
+        function triggerJackpotSequence(amount) {
+            document.getElementById('jackpot-win-amount').innerText = "$" + amount.toLocaleString();
+            document.getElementById('jackpot-overlay').style.display = 'flex';
+            document.body.classList.add('shaking');
+            SoundFX.jackpot();
+            fireConfetti(true);
+            setTimeout(() => document.body.classList.remove('shaking'), 2000);
+            credits += amount;
+            if(isBonusMode) bonusTotalWin += amount;
+            updateUI();
+        }
+
+        function closeJackpotScreen() { document.getElementById('jackpot-overlay').style.display = 'none'; }
+        function updateUI() {
+            document.getElementById('ui-balance').innerText = `$${credits}`;
+            document.getElementById('jackpot-display').innerText = `$${jackpot.toLocaleString()}`;
+            const jpContainer = document.getElementById('jackpot-ui');
+            if(jackpot > 10000) jpContainer.classList.add('hot');
+            else jpContainer.classList.remove('hot');
+        }
+
+        function toggleLines() {
+            showLinesMode = !showLinesMode;
+            const btn = document.getElementById('btn-lines');
+            if(showLinesMode) {
+                btn.classList.add('btn-active');
+                if(!isSpinning) drawGuides();
+            } else {
+                btn.classList.remove('btn-active');
+                if(!isSpinning) document.getElementById('payline-layer').innerHTML = '';
+            }
+        }
+
+        function drawGuides() {
+            const svg = document.getElementById('payline-layer');
+            let html = "";
+            LINES.forEach(l => html += getPolylineHtml(l, 0.5, l.color, 4)); 
+            svg.innerHTML = html;
+        }
+
+        function drawWinLines(wins) {
+            const svg = document.getElementById('payline-layer');
+            let html = "";
+            wins.forEach(w => html += getPolylineHtml(w.line, 1.0, w.line.color, 8));
+            svg.innerHTML = html;
+        }
+
+        function getPolylineHtml(line, opacity, color, width) {
+            let points = "";
+            line.coords.forEach((r, c) => {
+                let x = (c * 104) + 52;
+                let y = (r * 90) + 45;
+                points += `${x},${y} `;
+            });
+            return `<polyline points="${points}" fill="none" stroke="${color}" stroke-width="${width}" opacity="${opacity}" stroke-linecap="round" stroke-linejoin="round"/>`;
+        }
+
+        function animateBalance(amount) {
+            let obj = document.getElementById('ui-win');
+            obj.innerText = `+$${amount}`;
+            obj.style.transform = "scale(1.5)";
+            setTimeout(() => obj.style.transform = "scale(1)", 200);
+            credits += amount;
+            updateUI();
+        }
+
+        function openATM() { initAudio(); document.getElementById('atm-modal').style.display = 'flex'; }
+        function openPaytable() { initAudio(); document.getElementById('paytable-modal').style.display = 'flex'; }
+        function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+        
+        function withdrawCash() { 
+            credits += 1000; 
+            SoundFX.cash();
+            updateUI(); 
+            closeModal('atm-modal'); 
+        }
+
+        function renderPaytable() {
+            const c = document.getElementById('paytable-content');
+            let h = "";
+            PAYTABLE.forEach(s => {
+                if(!s.pay) return; 
+                let w3 = (SPIN_COST * s.pay[0]).toFixed(0);
+                let w4 = (SPIN_COST * s.pay[1]).toFixed(0);
+                let w5 = (SPIN_COST * s.pay[2]).toFixed(0);
+                h += `
+                <div class="pay-row">
+                    <div class="pay-icon">${s.img}</div>
+                    <div class="pay-col"><span class="pay-val">$${w3}</span></div>
+                    <div class="pay-col"><span class="pay-val">$${w4}</span></div>
+                    <div class="pay-col"><span class="pay-val">$${w5}</span></div>
+                </div>`;
+            });
+            c.innerHTML = h;
+        }
+
+        const cvs = document.getElementById('confetti');
+        const ctx = cvs.getContext('2d');
+        cvs.width = window.innerWidth; cvs.height = window.innerHeight;
+        let parts = [];
+
+        function fireConfetti(big) {
+            let n = big ? 500 : 80;
+            for(let i=0;i<n;i++) parts.push({
+                x: window.innerWidth/2, y: window.innerHeight/2,
+                vx: (Math.random()-0.5)*(big?30:15), vy: (Math.random()-0.5)*(big?30:15),
+                c: `hsl(${Math.random()*360},100%,50%)`, l: 1
+            });
+            tick();
+        }
+        function tick() {
+            ctx.clearRect(0,0,cvs.width,cvs.height);
+            parts.forEach((p,i)=>{
+                p.x+=p.vx; p.y+=p.vy; p.vy+=0.5; p.l-=0.01;
+                ctx.globalAlpha=p.l; ctx.fillStyle=p.c; ctx.beginPath(); ctx.arc(p.x,p.y,5,0,7); ctx.fill();
+                if(p.l<=0) parts.splice(i,1);
+            });
+            if(parts.length) requestAnimationFrame(tick);
+        }
+        window.onresize = () => { cvs.width=window.innerWidth; cvs.height=window.innerHeight; };
+
+    </script>
 </body>
 </html>
