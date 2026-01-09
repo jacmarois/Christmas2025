@@ -1,0 +1,1232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Slotro</title>
+    <style>
+        :root {
+            --bg: #151515;
+            --panel: #2c3e50;
+            --chip: #0984e3;
+            --mult: #d63031;
+            --gold: #f1c40f;
+            --text: #ecf0f1;
+            --green: #27ae60;
+            --red: #c0392b;
+            --gray: #7f8c8d;
+            
+            --reel-width: clamp(50px, 17vw, 95px);
+            --symbol-size: clamp(50px, 17vw, 95px);
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            background-color: var(--bg);
+            color: var(--text);
+            font-family: 'Courier New', monospace;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            user-select: none;
+            overflow: hidden;
+        }
+
+        /* --- CRT EFFECT --- */
+        body::before {
+            content: " ";
+            display: block;
+            position: absolute;
+            top: 0; left: 0; bottom: 0; right: 0;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+            z-index: 999;
+            background-size: 100% 2px, 3px 100%;
+            pointer-events: none;
+        }
+
+        .game-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+            width: 100%;
+            max-width: 600px;
+            padding: 10px;
+            position: relative; 
+        }
+
+        /* --- HUD --- */
+        .score-board {
+            display: flex;
+            justify-content: space-between;
+            width: 100%;
+            background: #000;
+            border: 2px solid #555;
+            padding: 10px;
+            border-radius: 10px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+            position: relative; 
+            margin-top: 25px;
+        }
+        .score-box { text-align: center; flex: 1; }
+        .score-label { font-size: 0.6rem; color: #888; text-transform: uppercase; letter-spacing: 1px;}
+        .score-val { font-size: 1.1rem; font-weight: bold; margin-top: 5px;}
+        
+        .chip-display { color: var(--red); text-shadow: 0 0 5px var(--red); transition: color 0.3s; }
+        .chip-display.safe { color: var(--green); text-shadow: 0 0 10px var(--green); }
+        .target-display { color: var(--gold); }
+
+        /* HEADER BUTTONS */
+        .header-btn {
+            position: absolute;
+            top: -28px;
+            background: #222;
+            border: 1px solid #555;
+            border-bottom: none;
+            color: #ccc;
+            padding: 6px 15px;
+            font-size: 0.8rem;
+            border-radius: 8px 8px 0 0;
+            cursor: pointer;
+            font-weight: bold;
+            font-family: 'Courier New', monospace;
+            z-index: 0;
+        }
+        .header-btn:hover { background: #444; color: #fff; }
+        .btn-deck { right: 10px; }
+        .btn-rules { left: 10px; }
+
+        /* --- RELICS --- */
+        .relic-rack {
+            display: flex;
+            gap: 8px;
+            min-height: 45px;
+            background: rgba(0,0,0,0.3);
+            padding: 5px;
+            border-radius: 8px;
+            width: 100%;
+            justify-content: center;
+            border: 1px solid #333;
+        }
+        .relic {
+            width: 35px; height: 35px;
+            background: #222;
+            border: 1px solid var(--gold);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            cursor: help;
+            position: relative;
+            transition: transform 0.2s;
+        }
+        .relic:hover { transform: scale(1.2); z-index: 10; }
+        .relic:hover::after {
+            content: attr(data-desc);
+            position: absolute;
+            bottom: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #333;
+            color: #fff;
+            padding: 5px;
+            font-size: 0.7rem;
+            white-space: nowrap;
+            border-radius: 4px;
+            z-index: 100;
+            border: 1px solid #fff;
+            pointer-events: none;
+        }
+
+        /* --- REELS --- */
+        .reels-area {
+            display: flex;
+            gap: 4px;
+            background: #000;
+            padding: 8px;
+            border-radius: 8px;
+            border: 4px solid #444;
+            position: relative;
+        }
+        
+        #payline-layer {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none;
+            z-index: 20;
+        }
+
+        .reel-container { display: flex; flex-direction: column; align-items: center; gap: 5px; }
+
+        .reel {
+            width: var(--reel-width);
+            height: calc(var(--symbol-size) * 3);
+            background: #ecf0f1;
+            overflow: hidden;
+            border-radius: 2px;
+            position: relative;
+            flex-shrink: 0; 
+            cursor: pointer;
+            transition: box-shadow 0.2s;
+        }
+        
+        .reel.held { box-shadow: inset 0 0 0 4px var(--gold); filter: brightness(0.8); }
+        
+        .hold-btn {
+            background: #333; color: #555;
+            border: 1px solid #555; font-size: 0.7rem;
+            padding: 4px 0; border-radius: 4px;
+            width: 100%; text-align: center;
+            font-weight: bold; cursor: pointer; user-select: none;
+            transition: all 0.2s;
+        }
+        .hold-btn.active {
+            background: var(--gold); color: #000;
+            border-color: #fff; box-shadow: 0 0 5px var(--gold);
+        }
+        .hold-btn.disabled { opacity: 0.3; cursor: not-allowed; }
+        .hold-btn.forbidden { 
+            background: #2c0000; color: #500; border-color: #500; cursor: not-allowed; 
+        }
+
+        .reel-strip { width: 100%; position: absolute; top: 0; left: 0; will-change: transform; }
+        .symbol {
+            width: 100%; height: var(--symbol-size);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 2.5rem;
+            border-bottom: 1px solid rgba(0,0,0,0.1);
+        }
+        .symbol img { width: 80%; height: 80%; object-fit: contain; }
+
+        .retrigger-effect {
+            animation: flashPulse 0.5s ease-out;
+            z-index: 10;
+        }
+        @keyframes flashPulse {
+            0% { filter: brightness(1); transform: scale(1); }
+            50% { filter: brightness(3) drop-shadow(0 0 10px white); transform: scale(1.2); }
+            100% { filter: brightness(1); transform: scale(1); }
+        }
+
+        /* --- ACTION --- */
+        #hold-all-btn {
+            background: #444; color: #ccc;
+            border: 1px solid #666; width: 100%;
+            padding: 8px; font-size: 0.9rem;
+            font-weight: bold; cursor: pointer;
+            border-radius: 5px; margin-bottom: 5px;
+            font-family: 'Courier New', monospace;
+            transition: all 0.2s;
+        }
+        #hold-all-btn:hover { background: #555; }
+        #hold-all-btn:active { background: #333; }
+        #hold-all-btn.disabled { opacity: 0.3; cursor: not-allowed; }
+
+        .action-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 100%;
+            background: #222;
+            padding: 10px 10px;
+            border-radius: 10px;
+            border: 1px solid #444;
+            gap: 10px;
+        }
+        .spins-left { font-size: 1.5rem; color: #fff; font-weight: bold; }
+        .spin-btn {
+            background: var(--chip); color: white; border: none;
+            padding: 15px 40px; font-size: 1.5rem; font-weight: bold;
+            border-radius: 5px; box-shadow: 0 5px 0 #0056b3;
+            cursor: pointer; font-family: 'Courier New', monospace; flex-grow: 1;
+        }
+        .spin-btn:active { transform: translateY(4px); box-shadow: 0 1px 0 #0056b3; }
+        .spin-btn:disabled { background: #555; box-shadow: none; transform: translateY(4px); opacity: 0.5; }
+        
+        .lines-btn {
+            background: #333; border: 1px solid #555; color: #ccc;
+            width: 50px; height: 50px; border-radius: 8px; font-size: 1.5rem;
+            cursor: pointer;
+        }
+        .lines-btn.active { background: var(--gold); color: #000; border-color: #fff; }
+
+        #calc-panel {
+            height: 30px; font-size: 1rem; color: #fff;
+            text-align: center; font-weight: bold; text-shadow: 0 0 5px var(--chip);
+        }
+
+        /* --- SHOP / OVERLAYS --- */
+        .overlay {
+            position: fixed; top:0; left:0; width:100%; height:100%;
+            background: rgba(0,0,0,0.95);
+            z-index: 2000;
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+        .shop-header { text-align: center; margin-bottom: 20px; }
+        
+        .shop-grid { 
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+            margin-top: 10px; 
+            width: 95%; 
+            max-width: 550px;
+        }
+        
+        .shop-card {
+            background: #222; border: 2px solid #555;
+            padding: 10px; 
+            width: 100%; height: 220px;
+            text-align: center; border-radius: 10px;
+            cursor: default; transition: transform 0.2s;
+            display: flex; flex-direction: column; justify-content: space-between;
+            align-items: center; position: relative;
+        }
+        
+        .shop-card.relic-card { border-color: var(--chip); box-shadow: 0 0 10px rgba(9, 132, 227, 0.2); }
+        .shop-card.upgrade-card { border-color: var(--gold); box-shadow: 0 0 10px rgba(241, 196, 15, 0.2); }
+        .shop-card.add-card { border-color: var(--green); box-shadow: 0 0 10px rgba(39, 174, 96, 0.2); }
+        .shop-card.remove-card { border-color: var(--red); box-shadow: 0 0 10px rgba(192, 57, 43, 0.2); }
+        
+        .card-icon-container { height: 80px; display: flex; align-items: center; justify-content: center; width: 100%; }
+        .card-icon { font-size: 4rem; line-height: 1; }
+        .card-title { font-size: 0.85rem; font-weight: bold; color: #fff; margin-bottom: 5px; line-height: 1.1; min-height: 2.2em; display:flex; align-items:center; justify-content: center;}
+        .card-desc { font-size: 0.7rem; color: #aaa; line-height: 1.3; flex-grow: 1; display:flex; align-items:center; justify-content: center; padding: 0 2px;}
+        
+        .card-price { 
+            width: 100%; padding: 8px 0; border-radius: 4px; 
+            font-size: 1rem; font-weight: bold; margin-top: auto;
+            transition: background 0.2s, color 0.2s;
+        }
+        .card-price.affordable { background: var(--green); color: white; cursor: pointer; box-shadow: 0 4px 0 #1e8449; }
+        .card-price.affordable:active { transform: translateY(2px); box-shadow: 0 2px 0 #1e8449; }
+        .card-price.expensive { background: #444; color: #888; cursor: not-allowed; box-shadow: none; }
+        
+        .next-round-btn {
+            margin-top: 25px; background: var(--gold); color: #000;
+            padding: 15px 50px; border: none; font-size: 1.5rem; font-weight: bold;
+            border-radius: 5px; cursor: pointer; box-shadow: 0 5px 0 #b7950b;
+        }
+        .next-round-btn:active { transform: translateY(4px); box-shadow: none; }
+
+        /* DECK OVERLAY */
+        .deck-list {
+            display: flex; flex-direction: column; gap: 8px;
+            width: 100%; max-width: 400px;
+            max-height: 60vh; overflow-y: auto;
+        }
+        .deck-item {
+            display: flex; align-items: center; justify-content: space-between;
+            background: #333; padding: 10px; border-radius: 8px; border: 1px solid #555;
+        }
+        .deck-info { display: flex; align-items: center; gap: 10px; font-size: 1.2rem; color: #fff; }
+        .deck-stats { font-size: 0.9rem; color: var(--chip); }
+        .deck-count { background: #555; color: #fff; padding: 2px 8px; border-radius: 10px; font-size: 0.8rem; }
+
+        /* SWAP OVERLAY */
+        .swap-grid { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
+        .swap-item { 
+            width: 80px; height: 100px; background: #333; border: 1px solid var(--gold); border-radius: 8px;
+            display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer;
+        }
+        .swap-item:hover { background: #444; border-color: var(--red); }
+        .swap-item .icon { font-size: 2rem; }
+        .swap-item .name { font-size: 0.7rem; color: #fff; margin-top: 5px; text-align: center; }
+
+        /* RULES OVERLAY */
+        .rules-content {
+            background: #222; border: 2px solid #555; border-radius: 10px;
+            padding: 20px; width: 90%; max-width: 500px; max-height: 80vh; overflow-y: auto;
+            color: #ccc; font-size: 0.9rem; line-height: 1.5;
+        }
+        .rules-content h2 { color: var(--gold); margin-top: 0; }
+        .rules-content h3 { color: var(--chip); margin-bottom: 5px; margin-top: 15px;}
+        .rules-content ul { padding-left: 20px; }
+
+        /* BONUS UI */
+        #bonus-ui {
+            display:none; flex-direction:column; align-items:center; 
+            background: radial-gradient(circle, #2c0000 0%, #000000 90%);
+            width:100%; height:100%; position:fixed; top:0; left:0; z-index:2500;
+        }
+        .bonus-grid {
+            display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px;
+            margin-top: 50px; width: 90%; max-width: 500px;
+        }
+        .bonus-cell {
+            aspect-ratio: 1; 
+            background: rgba(255,255,255,0.05);
+            border: 2px dashed #444; border-radius: 10px; 
+            display: flex; align-items: center; justify-content: center;
+            font-size: 2rem; color: #aaa;
+        }
+        .bonus-cell.coin {
+            background: radial-gradient(circle at 30% 30%, #ffd700, #b8860b);
+            border: 3px solid #fff; border-radius: 50%;
+            box-shadow: 0 0 20px rgba(255, 215, 0, 0.6), inset 0 0 10px rgba(0,0,0,0.2);
+            color: #4a3b00; font-weight: bold; font-size: 1.2rem;
+            text-shadow: 0 1px 0 rgba(255,255,255,0.5);
+            transform: scale(0.9);
+            animation: landCoin 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        @keyframes landCoin {
+            0% { transform: scale(1.5); opacity: 0; }
+            100% { transform: scale(0.9); opacity: 1; }
+        }
+
+        .pop { animation: pop 0.3s; }
+        @keyframes pop { 50% { transform: scale(1.3); } }
+
+    </style>
+</head>
+<body>
+
+    <div class="game-container">
+        
+        <div class="score-board">
+            <button class="header-btn btn-rules" onclick="openRules()">?</button>
+            <button class="header-btn btn-deck" onclick="openDeckView()">DECK</button>
+            <div class="score-box">
+                <div class="score-label">Score</div>
+                <div class="score-val chip-display" id="ui-current-score">0</div>
+            </div>
+            <div class="score-box">
+                <div class="score-label">Target</div>
+                <div class="score-val target-display" id="ui-target">100</div>
+            </div>
+            <div class="score-box">
+                <div class="score-label">Money</div>
+                <div class="score-val" style="color:#2ecc71" id="ui-money">$4</div>
+            </div>
+        </div>
+
+        <div class="relic-rack" id="relic-container">
+            <div class="relic" data-desc="Empty Slot" style="border: 1px dashed #555; color: #555;">?</div>
+        </div>
+
+        <div class="reels-area">
+            <svg id="payline-layer"></svg>
+            <!-- 5 REELS -->
+            <div class="reel-container"><div class="reel" id="reel-box-0" onclick="toggleHold(0)"><div class="reel-strip" id="reel-0"></div></div><div class="hold-btn disabled" id="hold-0" onclick="toggleHold(0)">HOLD</div></div>
+            <div class="reel-container"><div class="reel" id="reel-box-1" onclick="toggleHold(1)"><div class="reel-strip" id="reel-1"></div></div><div class="hold-btn disabled" id="hold-1" onclick="toggleHold(1)">HOLD</div></div>
+            <div class="reel-container"><div class="reel" id="reel-box-2" onclick="toggleHold(2)"><div class="reel-strip" id="reel-2"></div></div><div class="hold-btn disabled" id="hold-2" onclick="toggleHold(2)">HOLD</div></div>
+            <div class="reel-container"><div class="reel" id="reel-box-3" onclick="toggleHold(3)"><div class="reel-strip" id="reel-3"></div></div><div class="hold-btn disabled" id="hold-3" onclick="toggleHold(3)">HOLD</div></div>
+            <div class="reel-container"><div class="reel" id="reel-box-4" onclick="toggleHold(4)"><div class="reel-strip" id="reel-4"></div></div><div class="hold-btn disabled" id="hold-4" onclick="toggleHold(4)">HOLD</div></div>
+        </div>
+
+        <button id="hold-all-btn" class="disabled" onclick="toggleHoldAll()">HOLD ALL</button>
+
+        <div id="calc-panel">ROUND 1</div>
+
+        <div class="action-bar">
+            <button class="lines-btn" id="lines-btn" onclick="togglePaylines()">👁️</button>
+            <div class="score-box" style="text-align:left;">
+                <div class="score-label">Spins</div>
+                <div class="spins-left" id="ui-spins">4</div>
+            </div>
+            <button class="spin-btn" id="btn-spin" onclick="playHand()">SPIN</button>
+        </div>
+
+    </div>
+
+    <!-- BONUS GAME UI -->
+    <div id="bonus-ui">
+        <h1 style="color:var(--gold); margin-top:50px; text-shadow:0 0 20px orange;">SLEIGH RIDE</h1>
+        <div style="font-size:1rem; color:#aaa; margin-bottom:20px;">Collect Coins! Resets Spins to 3.</div>
+        <div class="bonus-grid" id="bonus-grid"></div>
+        <div style="font-size:2rem; color:#fff; margin-top:20px; font-weight:bold;">SPINS: <span id="bonus-spins" style="color:var(--gold)">3</span></div>
+        <div style="font-size:1.5rem; color:#aaa; font-weight:bold;">WIN: <span id="bonus-win">0</span></div>
+    </div>
+
+    <!-- SHOP -->
+    <div id="shop-overlay" class="overlay">
+        <h1 style="color:var(--gold); font-size: 3rem; margin:0;">SHOP</h1>
+        <p style="margin-top:5px; color:#aaa;">Choose wisely.</p>
+        <p>Wallet: <span id="shop-funds" style="color:var(--green)">$0</span></p>
+        <div class="shop-grid" id="shop-items"></div>
+        <button class="next-round-btn" onclick="nextRound()">NEXT ROUND</button>
+    </div>
+
+    <!-- SWAP OVERLAY -->
+    <div id="swap-overlay" class="overlay">
+        <h1 style="color:var(--red); font-size: 2rem;">INVENTORY FULL</h1>
+        <p>Select an item to replace:</p>
+        <div class="swap-grid" id="swap-items"></div>
+        <button class="next-round-btn" onclick="document.getElementById('swap-overlay').style.display='none'">CANCEL</button>
+    </div>
+
+    <!-- DECK VIEW -->
+    <div id="deck-overlay" class="overlay">
+        <h1 style="color:var(--chip); font-size: 2.5rem; margin-bottom: 20px;">DECK INFO</h1>
+        <div class="deck-list" id="deck-list-content" style="width: 100%; max-width: 400px; max-height: 60vh; overflow-y: auto; display:flex; flex-direction:column; gap:8px;"></div>
+        <button class="next-round-btn" onclick="document.getElementById('deck-overlay').style.display='none'">CLOSE</button>
+    </div>
+
+    <!-- RULES VIEW -->
+    <div id="rules-overlay" class="overlay">
+        <div class="rules-content">
+            <h2>HOW TO PLAY</h2>
+            <h3>Goal</h3>
+            <p>Score enough chips to beat the <strong>Target</strong> score before you run out of Spins. If you fail, it's Game Over.</p>
+            <h3>Gameplay</h3>
+            <ul>
+                <li>Spin the reels to find matches of 3, 4, or 5 symbols on a line.</li>
+                <li>After a spin, use the <strong>HOLD</strong> buttons to lock good reels.</li>
+                <li><strong>Warning:</strong> Reels with a Sleigh (🛷) cannot be held.</li>
+                <li>Holding uses up a Spin. Plan carefully!</li>
+            </ul>
+            <h3>The Shop</h3>
+            <p>After beating a round, spend money to add cards, remove junk, or buy Relics to boost your score.</p>
+            <h3>Bonuses</h3>
+            <ul>
+                <li><strong>Wild (🃏):</strong> Substitutes for any symbol.</li>
+                <li><strong>Sleigh (🛷):</strong> Land 3 anywhere to trigger the Bonus Game.</li>
+                <li><strong>Grinch (👺):</strong> Every 3 rounds, he adds a negative card to your deck. Remove it quickly!</li>
+            </ul>
+        </div>
+        <button class="next-round-btn" onclick="document.getElementById('rules-overlay').style.display='none'">CLOSE</button>
+    </div>
+
+    <!-- GRINCH ALERT -->
+    <div id="alert-overlay" class="overlay" onclick="this.style.display='none'">
+        <div style="background:#2c3e50; border:4px solid var(--red); padding:30px; border-radius:15px; text-align:center;">
+            <div style="font-size:4rem;">👺</div>
+            <h2 style="color:var(--red)">THE GRINCH!</h2>
+            <p>He added a card to your deck!</p>
+        </div>
+    </div>
+
+    <!-- GAME OVER -->
+    <div id="game-over-overlay" class="overlay" style="background:#2c0b0b;">
+        <h1 style="color:var(--red); font-size: 4rem;">DEFEAT</h1>
+        <p>Rounds Survived: <span id="go-rounds">0</span></p>
+        <button class="next-round-btn" onclick="location.reload()">TRY AGAIN</button>
+    </div>
+
+    <script>
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        let audioCtx;
+        function initAudio() { if(!audioCtx) audioCtx = new AudioContext(); if(audioCtx.state==='suspended') audioCtx.resume(); }
+        const SoundFX = {
+            playTone: (freq, type, duration, vol=0.1) => {
+                if(!audioCtx) return;
+                const osc = audioCtx.createOscillator(); const gain = audioCtx.createGain();
+                osc.type = type; osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+                gain.gain.setValueAtTime(0, audioCtx.currentTime); gain.gain.linearRampToValueAtTime(vol, audioCtx.currentTime + 0.05);
+                gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+                osc.connect(gain); gain.connect(audioCtx.destination); osc.start(); osc.stop(audioCtx.currentTime + duration);
+            },
+            spin: () => SoundFX.playTone(400, 'triangle', 0.05, 0.05),
+            stop: () => SoundFX.playTone(100, 'sine', 0.1, 0.2),
+            coin: () => { SoundFX.playTone(1200, 'square', 0.1, 0.05); setTimeout(() => SoundFX.playTone(1600, 'square', 0.1, 0.05), 50); },
+            score: (val) => { let freq = 400 + Math.min(val, 1000); SoundFX.playTone(freq, 'sine', 0.3, 0.1); },
+            retrigger: () => { SoundFX.playTone(800, 'sine', 0.1, 0.2); setTimeout(()=>SoundFX.playTone(1200, 'sine', 0.2, 0.1), 50); },
+            grinch: () => { SoundFX.playTone(100, 'sawtooth', 0.5, 0.2); setTimeout(()=>SoundFX.playTone(80, 'sawtooth', 0.5, 0.2), 100); },
+            bonusHit: () => { SoundFX.playTone(600, 'square', 0.1, 0.1); setTimeout(()=>SoundFX.playTone(900, 'square', 0.2, 0.1), 100); }
+        };
+
+        const SYMBOLS = {
+            'cookie': { id: 'cookie', img: '🍪', chips: 10,  name: 'Cookie' },
+            'snow':   { id: 'snow',   img: '❄️', chips: 10,  name: 'Snow' },
+            'tree':   { id: 'tree',   img: '🎄', chips: 20, name: 'Tree' },
+            'beer':   { id: 'beer',   img: '🥂', chips: 30, name: 'Beer' },
+            'gift':   { id: 'gift',   img: '🎁', chips: 50, name: 'Gift' },
+            'santa':  { id: 'santa',  img: '🎅', chips: 100, name: 'Santa' },
+            'wild':   { id: 'wild',   img: '🃏', chips: 0,  name: 'Wild' },
+            'grinch': { id: 'grinch', img: '👺', chips: -100, name: 'Grinch' },
+            'sleigh': { id: 'sleigh', img: '🛷', chips: 0,    name: 'Bonus' }
+        };
+
+        const RELICS = [
+            { id: 'ornament', icon: '🔴', name: 'Red Ball', desc: '+1 Mult per Spin', price: 8 },
+            { id: 'star',     icon: '⭐', name: 'Star',     desc: '+50 Chips on Win', price: 10 },
+            { id: 'avalanche',icon: '🏔️', name: 'Avalanche',desc: 'Retrigger Snow', price: 10 },
+            { id: 'hat',      icon: '🎩', name: 'Top Hat',  desc: 'Snow gives +2 Mult', price: 10 },
+            { id: 'bell',     icon: '🔔', name: 'Bell',     desc: '+1 Spin per Round', price: 15 },
+            { id: 'tinsel',   icon: '✨', name: 'Tinsel',   desc: 'Trees give +20 Chips', price: 12 },
+            { id: 'cocoa',    icon: '☕', name: 'Cocoa',    desc: 'Snow gives +20 Chips', price: 12 },
+            { id: 'wreath',   icon: '🌿', name: 'Wreath',   desc: 'Top/Bot Lines 2x Chips', price: 15 },
+            { id: 'stocking', icon: '🧦', name: 'Stocking', desc: 'Retrigger Gifts', price: 15 },
+            { id: 'chimney',  icon: '🏠', name: 'Chimney',  desc: 'Retrigger Santa', price: 20 },
+            { id: 'coal',     icon: '⚫', name: 'Coal',     desc: '-1 Spin, +5 Mult', price: 10 }
+        ];
+
+        const CONSUMABLES = [
+            { type: 'add', sym: 'santa', name: 'Invite Santa', price: 10, icon: '🎅', desc: 'Add 1 Santa' },
+            { type: 'add', sym: 'gift',  name: 'Wrap Gift',    price: 8,  icon: '🎁', desc: 'Add 1 Gift' },
+            { type: 'add', sym: 'beer',  name: 'Brew Beer',    price: 6,  icon: '🥂', desc: 'Add 1 Beer' },
+            { type: 'add', sym: 'wild',  name: 'Joker Card',   price: 12, icon: '🃏', desc: 'Add 1 Wild' },
+            { type: 'add', sym: 'tree',  name: 'Plant Tree',   price: 5,  icon: '🎄', desc: 'Add 1 Tree' },
+            { type: 'rem', sym: 'cookie',name: 'Eat Cookie',   price: 6,  icon: '🍪', desc: 'Remove 1 Cookie' },
+            { type: 'rem', sym: 'snow',  name: 'Melt Snow',    price: 6,  icon: '❄️', desc: 'Remove 1 Snow' },
+            { type: 'rem', sym: 'tree',  name: 'Chop Tree',    price: 6,  icon: '🎄', desc: 'Remove 1 Tree' },
+            { type: 'rem', sym: 'grinch',name: 'Evict Grinch', price: 8,  icon: '👺', desc: 'Remove 1 Grinch' }
+        ];
+
+        const UPGRADES = [ { type: 'upgrade', name: 'Extra Pocket', price: 15, icon: '🎒', desc: '+1 Item Slot' } ];
+
+        const STATE = {
+            round: 1, target: 100, score: 0,
+            spinsMax: 4, spinsLeft: 4, money: 4,
+            maxRelics: 5, inflation: 0,
+            inventory: [], deck: [],
+            held: [false, false, false, false, false], 
+            lastResult: [[],[],[],[],[]],
+            canHold: false, showLines: false
+        };
+
+        const MIN_DECK = 20;
+
+        function initDeck() {
+            let d = [];
+            for(let i=0; i<10; i++) d.push('cookie');
+            for(let i=0; i<10; i++) d.push('snow');
+            for(let i=0; i<4; i++)  d.push('tree');
+            for(let i=0; i<1; i++)  d.push('gift'); 
+            STATE.deck = d;
+        }
+
+        const REELS = 5;
+        const ROWS = 3;
+        let reelStrips = [];
+
+        window.onload = () => {
+            initDeck();
+            for(let i=0; i<REELS; i++) {
+                reelStrips[i] = document.getElementById(`reel-${i}`);
+                let set = getRandomSet(3);
+                STATE.lastResult[i] = set;
+                renderStrip(i, set); 
+            }
+            updateUI();
+            updateHoldButtons();
+            renderRelics();
+        };
+
+        function getRandomSet(count) {
+            let arr = [];
+            for(let i=0; i<count; i++) arr.push(STATE.deck[Math.floor(Math.random() * STATE.deck.length)]);
+            return arr;
+        }
+
+        function renderStrip(reelIdx, symbols) {
+            let html = "";
+            symbols.forEach(sid => {
+                let s = SYMBOLS[sid];
+                html += `<div class="symbol">${s.img}</div>`;
+            });
+            reelStrips[reelIdx].innerHTML = html;
+            reelStrips[reelIdx].style.transition = 'none';
+            reelStrips[reelIdx].style.transform = 'translateY(0)';
+        }
+
+        function toggleHold(idx) {
+            if(!STATE.canHold || document.getElementById('btn-spin').disabled) return;
+            const reelCol = STATE.lastResult[idx];
+            if(reelCol.includes('sleigh')) return; 
+            STATE.held[idx] = !STATE.held[idx];
+            const reelBox = document.getElementById(`reel-box-${idx}`);
+            const holdBtn = document.getElementById(`hold-${idx}`);
+            if(STATE.held[idx]) { reelBox.classList.add('held'); holdBtn.classList.add('active'); }
+            else { reelBox.classList.remove('held'); holdBtn.classList.remove('active'); }
+        }
+
+        function toggleHoldAll() {
+            if (!STATE.canHold || document.getElementById('btn-spin').disabled) return;
+            let validIndices = [];
+            for(let i=0; i<REELS; i++) {
+                if(!STATE.lastResult[i].includes('sleigh')) validIndices.push(i);
+            }
+            const allValidHeld = validIndices.every(i => STATE.held[i]);
+            validIndices.forEach(i => {
+                if(STATE.held[i] !== !allValidHeld) toggleHold(i);
+            });
+        }
+
+        function clearHolds() {
+            STATE.held = [false, false, false, false, false];
+            for(let i=0; i<REELS; i++) {
+                document.getElementById(`reel-box-${i}`).classList.remove('held');
+                document.getElementById(`hold-${i}`).classList.remove('active');
+            }
+        }
+
+        function updateHoldButtons() {
+            const btns = document.querySelectorAll('.hold-btn');
+            const masterBtn = document.getElementById('hold-all-btn');
+            if(STATE.canHold) {
+                masterBtn.classList.remove('disabled');
+                btns.forEach((b, idx) => {
+                    const hasSleigh = STATE.lastResult[idx].includes('sleigh');
+                    if(hasSleigh) {
+                        b.classList.add('forbidden');
+                        b.innerText = "NO HOLD";
+                    } else {
+                        b.classList.remove('disabled');
+                        b.classList.remove('forbidden');
+                        b.innerText = "HOLD";
+                    }
+                });
+            } else {
+                btns.forEach(b => {
+                    b.classList.add('disabled');
+                    b.classList.remove('forbidden');
+                    b.innerText = "HOLD";
+                });
+                masterBtn.classList.add('disabled');
+            }
+        }
+
+        function togglePaylines() {
+            STATE.showLines = !STATE.showLines;
+            const btn = document.getElementById('lines-btn');
+            const svg = document.getElementById('payline-layer');
+            if(STATE.showLines) {
+                btn.classList.add('active');
+                drawGuideLines();
+            } else {
+                btn.classList.remove('active');
+                svg.innerHTML = "";
+            }
+        }
+
+        function drawGuideLines() {
+            const svg = document.getElementById('payline-layer');
+            if(document.querySelectorAll('.reel').length === 0) return;
+            const reelRect = document.querySelector('.reel').getBoundingClientRect();
+            const containerRect = document.querySelector('.reels-area').getBoundingClientRect();
+            const rw = reelRect.width; const sh = reelRect.height / 3; 
+            const startX = reelRect.left - containerRect.left;
+            const lines = [
+                { coords:[0,0,0,0,0], color:'#e74c3c' }, 
+                { coords:[1,1,1,1,1], color:'#f1c40f' }, 
+                { coords:[2,2,2,2,2], color:'#2ecc71' }, 
+                { coords:[0,1,2,1,0], color:'#3498db' }, 
+                { coords:[2,1,0,1,2], color:'#9b59b6' }
+            ];
+            let html = "";
+            lines.forEach(l => {
+                let points = "";
+                for(let c=0; c<5; c++) {
+                    const r = l.coords[c];
+                    const r1 = document.getElementById('reel-box-0').getBoundingClientRect();
+                    const r2 = document.getElementById('reel-box-1').getBoundingClientRect();
+                    const stride = r2.left - r1.left;
+                    const x = startX + (c * stride) + (rw/2);
+                    const y = (r * sh) + (sh/2);
+                    points += `${x},${y} `;
+                }
+                html += `<polyline points="${points}" fill="none" stroke="${l.color}" stroke-width="2" opacity="0.3" stroke-linecap="round" stroke-linejoin="round" />`;
+            });
+            svg.innerHTML = html;
+        }
+
+        function playHand() {
+            if(STATE.spinsLeft <= 0) return;
+            initAudio();
+            STATE.spinsLeft--;
+            STATE.canHold = false;
+            updateHoldButtons();
+            updateUI();
+            document.getElementById('btn-spin').disabled = true;
+            document.getElementById('calc-panel').innerHTML = "";
+            if(!STATE.showLines) document.getElementById('payline-layer').innerHTML = "";
+
+            let delayMax = 0;
+            for(let c=0; c<REELS; c++) {
+                if(STATE.held[c]) continue;
+                let col = [];
+                for(let r=0; r<ROWS; r++) {
+                    let sym = STATE.deck[Math.floor(Math.random() * STATE.deck.length)];
+                    if (Math.random() < 0.04) sym = 'sleigh'; 
+                    col.push(sym);
+                }
+                STATE.lastResult[c] = col;
+                animateReel(c, col);
+                delayMax = Math.max(delayMax, 1 + (c*0.2));
+            }
+
+            let waitTime = STATE.held.every(Boolean) ? 200 : (delayMax * 1000);
+            setTimeout(() => { calculateScore(); clearHolds(); }, waitTime);
+        }
+
+        function animateReel(reelIdx, finalSyms) {
+            const strip = reelStrips[reelIdx];
+            const spinLength = 10 + (reelIdx * 2);
+            let visualList = getRandomSet(spinLength).concat(finalSyms);
+            renderStrip(reelIdx, visualList);
+            void strip.offsetWidth; 
+            if(reelIdx===0) SoundFX.spin();
+            const symHeight = strip.querySelector('.symbol').offsetHeight;
+            const targetY = -(spinLength * symHeight);
+            strip.style.transition = `transform ${1 + (reelIdx * 0.2)}s cubic-bezier(0.2, 0.9, 0.3, 1)`;
+            strip.style.transform = `translateY(${targetY}px)`;
+            setTimeout(() => SoundFX.stop(), (1 + (reelIdx * 0.2)) * 1000);
+        }
+
+        function calculateScore() {
+            let baseChips = 0;
+            let mult = 1;
+            let winsToDraw = [];
+            let sleighCount = 0;
+
+            if(hasRelic('ornament')) mult += 1;
+            let coalCount = STATE.inventory.filter(r => r.id === 'coal').length;
+            mult += (coalCount * 5);
+
+            STATE.lastResult.forEach(col => {
+                col.forEach(s => { if(s === 'sleigh') sleighCount++; });
+            });
+
+            if(sleighCount >= 3) {
+                setTimeout(startBonusGame, 500);
+                return; 
+            }
+
+            const lines = [
+                { id:0, coords:[0,0,0,0,0], color:'#e74c3c' }, 
+                { id:1, coords:[1,1,1,1,1], color:'#f1c40f' }, 
+                { id:2, coords:[2,2,2,2,2], color:'#2ecc71' }, 
+                { id:3, coords:[0,1,2,1,0], color:'#3498db' }, 
+                { id:4, coords:[2,1,0,1,2], color:'#9b59b6' }
+            ];
+
+            lines.forEach((lineObj, lineIdx) => {
+                let syms = lineObj.coords.map((r, c) => STATE.lastResult[c][r]);
+                let targetId = 'wild';
+                for(let s of syms) { if(s !== 'wild' && s !== 'sleigh') { targetId = s; break; } }
+
+                let count = 0;
+                for(let i=0; i<5; i++) {
+                    if(syms[i] === 'sleigh') break; 
+                    if(syms[i] === targetId || syms[i] === 'wild' || targetId === 'wild') count++;
+                    else break;
+                }
+
+                if(count >= 3) {
+                    winsToDraw.push({ line: lineObj, count: count });
+                    let lineChips = 0;
+                    for(let k=0; k<count; k++) {
+                        let id = syms[k];
+                        let val = 0;
+                        if(id === 'wild') val = (targetId !== 'wild') ? SYMBOLS[targetId].chips : 50; 
+                        else val = SYMBOLS[id].chips;
+                        
+                        if(id === 'snow' && hasRelic('hat')) mult += 2;
+                        if(id === 'snow' && hasRelic('cocoa')) lineChips += 20;
+                        if(id === 'tree' && hasRelic('tinsel')) lineChips += 20;
+                        
+                        if(id === 'snow' && hasRelic('avalanche')) { lineChips += val; triggerRetriggerEffect(k, lineObj.coords[k]); }
+                        if(id === 'gift' && hasRelic('stocking')) { lineChips += val; triggerRetriggerEffect(k, lineObj.coords[k]); }
+                        if(id === 'santa' && hasRelic('chimney')) { lineChips += val; triggerRetriggerEffect(k, lineObj.coords[k]); }
+                        
+                        lineChips += val;
+                    }
+                    if(hasRelic('wreath') && (lineIdx === 0 || lineIdx === 2)) lineChips *= 2;
+                    baseChips += lineChips;
+                    mult += (count - 1); 
+                }
+            });
+
+            if(baseChips > 0 && hasRelic('star')) baseChips += 50;
+
+            let total = baseChips * mult;
+            STATE.score += total;
+
+            if(winsToDraw.length > 0) {
+                drawWinLines(winsToDraw);
+                SoundFX.score(total);
+            }
+
+            const panel = document.getElementById('calc-panel');
+            panel.innerHTML = `<span class="chip-display">${baseChips}</span> x <span class="mult-display">${mult}</span> = <span class="target-display">${total}</span>`;
+            if(total > 0) panel.classList.add('pop');
+            setTimeout(()=>panel.classList.remove('pop'), 300);
+
+            updateUI();
+
+            setTimeout(() => {
+                if(STATE.spinsLeft === 0) {
+                    if (STATE.score >= STATE.target) openShop();
+                    else gameOver();
+                } else {
+                    document.getElementById('btn-spin').disabled = false;
+                    STATE.canHold = true;
+                    updateHoldButtons();
+                }
+            }, 1000);
+        }
+
+        function triggerRetriggerEffect(col, row) {
+            const strip = document.getElementById(`reel-${col}`);
+            const children = strip.children;
+            const targetIndex = children.length - 3 + row;
+            const el = children[targetIndex];
+            if(el) {
+                el.classList.add('retrigger-effect');
+                SoundFX.retrigger();
+                setTimeout(() => el.classList.remove('retrigger-effect'), 500);
+            }
+        }
+
+        function hasRelic(id) { return STATE.inventory.some(r => r.id === id); }
+
+        function drawWinLines(wins) {
+            const svg = document.getElementById('payline-layer');
+            if(!STATE.showLines) svg.innerHTML = ""; 
+            const reels = document.querySelectorAll('.reel');
+            if(reels.length === 0) return;
+            const reelRect = reels[0].getBoundingClientRect();
+            const containerRect = document.querySelector('.reels-area').getBoundingClientRect();
+            const rw = reelRect.width; const sh = reelRect.height / 3; 
+            const startX = reelRect.left - containerRect.left;
+            const r2 = document.getElementById('reel-box-1').getBoundingClientRect();
+            const stride = r2.left - reelRect.left;
+            let html = svg.innerHTML; 
+            wins.forEach(w => {
+                let points = "";
+                for(let c=0; c<w.count; c++) {
+                    const r = w.line.coords[c];
+                    const x = startX + (c * stride) + (rw/2);
+                    const y = (r * sh) + (sh/2);
+                    points += `${x},${y} `;
+                }
+                html += `<polyline points="${points}" fill="none" stroke="${w.line.color}" stroke-width="6" opacity="0.9" stroke-linecap="round" stroke-linejoin="round" />`;
+            });
+            svg.innerHTML = html;
+        }
+
+        let bonusSpins = 3;
+        let bonusGrid = []; 
+
+        function startBonusGame() {
+            document.getElementById('bonus-ui').style.display = 'flex';
+            bonusSpins = 3;
+            bonusGrid = new Array(15).fill(0);
+            let initialWin = 0;
+            STATE.lastResult.forEach((col, cIdx) => {
+                col.forEach((sym, rIdx) => {
+                    if(sym === 'sleigh') {
+                        let flatIdx = (rIdx * 5) + cIdx;
+                        let val = STATE.round * 10;
+                        bonusGrid[flatIdx] = val;
+                        initialWin += val;
+                    }
+                });
+            });
+            renderBonusGrid();
+            document.getElementById('bonus-spins').innerText = bonusSpins;
+            document.getElementById('bonus-win').innerText = initialWin;
+            setTimeout(playBonusSpin, 1000);
+        }
+
+        function playBonusSpin() {
+            if(bonusSpins <= 0) { endBonusGame(); return; }
+            bonusSpins--;
+            document.getElementById('bonus-spins').innerText = bonusSpins;
+            SoundFX.spin();
+            let cells = document.querySelectorAll('.bonus-cell');
+            cells.forEach((c, i) => { if(bonusGrid[i] === 0) c.innerText = "❄️"; });
+
+            setTimeout(() => {
+                let hit = false;
+                for(let i=0; i<15; i++) {
+                    if(bonusGrid[i] === 0) {
+                        if(Math.random() < 0.15) {
+                            hit = true;
+                            bonusGrid[i] = STATE.round * 10;
+                        }
+                    }
+                }
+                if(hit) { bonusSpins = 3; SoundFX.bonusHit(); } else { SoundFX.stop(); }
+                renderBonusGrid();
+                document.getElementById('bonus-spins').innerText = bonusSpins;
+                let total = bonusGrid.reduce((a,b)=>a+b,0);
+                document.getElementById('bonus-win').innerText = total;
+                setTimeout(playBonusSpin, 1000);
+            }, 800);
+        }
+
+        function renderBonusGrid() {
+            const grid = document.getElementById('bonus-grid');
+            grid.innerHTML = '';
+            bonusGrid.forEach(val => {
+                let div = document.createElement('div');
+                div.className = val > 0 ? 'bonus-cell coin' : 'bonus-cell';
+                div.innerText = val > 0 ? val : "";
+                grid.appendChild(div);
+            });
+        }
+
+        function endBonusGame() {
+            let total = bonusGrid.reduce((a,b)=>a+b,0);
+            STATE.score += total;
+            document.getElementById('bonus-ui').style.display = 'none';
+            updateUI();
+            if(STATE.spinsLeft === 0) {
+                if(STATE.score >= STATE.target) openShop();
+                else gameOver();
+            } else {
+                document.getElementById('btn-spin').disabled = false;
+                STATE.canHold = true;
+                updateHoldButtons();
+            }
+        }
+
+        function getInflationPrice(basePrice) { return basePrice + (STATE.inflation * 2); }
+
+        function openShop() {
+            let reward = 5 + Math.floor((STATE.score - STATE.target)/100);
+            STATE.money += reward;
+            document.getElementById('shop-funds').innerText = `$${STATE.money}`;
+            
+            const grid = document.getElementById('shop-items');
+            grid.innerHTML = '';
+
+            let availableRelics = RELICS.filter(r => !hasRelic(r.id)).map(r => ({...r, shopType: 'relic'}));
+            let consumables = CONSUMABLES.map(c => ({...c, shopType: 'consumable'}));
+            let upgrades = UPGRADES.map(u => ({...u, shopType: 'upgrade'}));
+            let pool = [...availableRelics, ...consumables, ...upgrades];
+            
+            let shopOptions = [];
+            for(let i=0; i<6; i++) {
+                if(pool.length === 0) break;
+                let idx = Math.floor(Math.random() * pool.length);
+                shopOptions.push(pool[idx]);
+                pool.splice(idx, 1);
+            }
+
+            shopOptions.forEach(item => {
+                genShopCard(grid, item);
+            });
+
+            document.getElementById('shop-overlay').style.display = 'flex';
+        }
+
+        function genShopCard(container, item) {
+            let div = document.createElement('div');
+            let cardClass = 'shop-card';
+            if(item.shopType === 'relic') cardClass += ' relic-card';
+            else if(item.shopType === 'upgrade') cardClass += ' upgrade-card';
+            else if(item.shopType === 'consumable') {
+                if(item.type === 'add') cardClass += ' add-card';
+                else if(item.type === 'rem') cardClass += ' remove-card';
+            }
+            div.className = cardClass;
+            
+            let iconHtml = `<div class="card-icon-container"><div class="card-icon">${item.icon}</div></div>`;
+            let title = item.name;
+            let desc = item.desc;
+
+            div.innerHTML = `
+                ${iconHtml}
+                <div class="card-title">${title}</div>
+                <div class="card-desc">${desc}</div>
+                <div class="card-price" id="btn-${item.name.replace(/\s/g,'')}">$${item.price}</div>
+            `;
+            
+            div.dataset.basePrice = item.price;
+            div.dataset.type = item.shopType;
+            div.dataset.consumableType = item.type; 
+
+            updateCardState(div);
+
+            div.onclick = () => {
+                let price = parseInt(div.dataset.currentPrice);
+                if(item.shopType === 'consumable' && item.type === 'rem' && STATE.deck.length <= MIN_DECK) return;
+
+                if(STATE.money >= price) {
+                    if(item.shopType === 'relic' && STATE.inventory.length >= STATE.maxRelics) {
+                        showSwapUI(item, div);
+                        return;
+                    }
+                    purchaseItem(item, div);
+                }
+            };
+            
+            container.appendChild(div);
+        }
+
+        function purchaseItem(item, cardDiv) {
+            let price = parseInt(cardDiv.dataset.currentPrice);
+            SoundFX.coin();
+            STATE.money -= price;
+            document.getElementById('shop-funds').innerText = `$${STATE.money}`;
+            
+            if(item.shopType === 'relic') {
+                STATE.inventory.push(item);
+                renderRelics();
+            } else if (item.shopType === 'upgrade') {
+                STATE.maxRelics++;
+                renderRelics();
+            } else if (item.shopType === 'consumable') {
+                STATE.inflation++;
+                if(item.type === 'add') STATE.deck.push(item.sym);
+                else if (item.type === 'rem') {
+                    let idx = STATE.deck.indexOf(item.sym);
+                    if(idx > -1) STATE.deck.splice(idx, 1);
+                }
+            }
+
+            cardDiv.remove(); 
+            let availableRelics = RELICS.filter(r => !hasRelic(r.id)).map(r => ({...r, shopType: 'relic'}));
+            let consumables = CONSUMABLES.map(c => ({...c, shopType: 'consumable'}));
+            let upgrades = UPGRADES.map(u => ({...u, shopType: 'upgrade'}));
+            let pool = [...availableRelics, ...consumables, ...upgrades];
+            let newItem = pool[Math.floor(Math.random() * pool.length)];
+            const grid = document.getElementById('shop-items');
+            genShopCard(grid, newItem);
+
+            refreshShopUI();
+        }
+
+        function showSwapUI(newItem, shopCardDiv) {
+            const swapOverlay = document.getElementById('swap-overlay');
+            const swapGrid = document.getElementById('swap-items');
+            swapGrid.innerHTML = '';
+            STATE.inventory.forEach((relic, index) => {
+                let div = document.createElement('div');
+                div.className = 'swap-item';
+                div.innerHTML = `<div class="icon">${relic.icon}</div><div class="name">${relic.name}</div>`;
+                div.onclick = () => {
+                    STATE.inventory.splice(index, 1);
+                    purchaseItem(newItem, shopCardDiv);
+                    swapOverlay.style.display = 'none';
+                };
+                swapGrid.appendChild(div);
+            });
+            swapOverlay.style.display = 'flex';
+        }
+
+        function refreshShopUI() {
+            const cards = document.querySelectorAll('.shop-card');
+            cards.forEach(card => updateCardState(card));
+        }
+
+        function updateCardState(card) {
+            let basePrice = parseInt(card.dataset.basePrice);
+            let type = card.dataset.type;
+            let subType = card.dataset.consumableType;
+            let currentPrice = (type === 'consumable') ? getInflationPrice(basePrice) : basePrice;
+            
+            card.dataset.currentPrice = currentPrice;
+            let btn = card.querySelector('.card-price');
+            btn.innerText = `$${currentPrice}`;
+
+            if(type === 'consumable' && subType === 'rem' && STATE.deck.length <= MIN_DECK) {
+                btn.className = 'card-price expensive';
+                btn.innerText = "MIN DECK";
+                return;
+            }
+
+            if(STATE.money >= currentPrice) btn.className = 'card-price affordable';
+            else btn.className = 'card-price expensive';
+        }
+
+        function nextRound() {
+            document.getElementById('shop-overlay').style.display = 'none';
+            STATE.round++;
+            STATE.target = Math.floor(STATE.target * 1.35);
+            STATE.score = 0;
+            
+            let bellCount = STATE.inventory.filter(i => i.id === 'bell').length;
+            let coalCount = STATE.inventory.filter(i => i.id === 'coal').length;
+            let baseSpins = 4 + bellCount - coalCount;
+            
+            STATE.spinsLeft = Math.max(1, baseSpins);
+            STATE.spinsMax = baseSpins;
+
+            document.getElementById('btn-spin').disabled = false;
+            document.getElementById('calc-panel').innerHTML = "ROUND " + STATE.round;
+            document.getElementById('payline-layer').innerHTML = "";
+            
+            // GRINCH
+            if(STATE.round % 3 === 0) {
+                STATE.deck.push('grinch');
+                SoundFX.grinch();
+                document.getElementById('alert-overlay').style.display = 'flex';
+            }
+
+            clearHolds();
+            STATE.canHold = false; 
+            updateHoldButtons();
+            
+            for(let i=0; i<REELS; i++) {
+                let set = getRandomSet(3);
+                STATE.lastResult[i] = set;
+                renderStrip(i, set);
+            }
+
+            updateUI();
+        }
+
+        function gameOver() {
+            document.getElementById('go-rounds').innerText = STATE.round;
+            document.getElementById('game-over-overlay').style.display = 'flex';
+        }
+
+        function openDeckView() {
+            const list = document.getElementById('deck-list-content');
+            list.innerHTML = '';
+            let counts = {};
+            STATE.deck.forEach(s => counts[s] = (counts[s]||0)+1);
+            
+            Object.keys(SYMBOLS).forEach(key => {
+                let s = SYMBOLS[key];
+                let count = counts[key] || 0;
+                if(count > 0 || key === 'wild') {
+                    let div = document.createElement('div');
+                    div.className = 'deck-item';
+                    div.innerHTML = `
+                        <div class="deck-info"><span>${s.img}</span><span>${s.name}</span></div>
+                        <div style="display:flex; gap:15px; align-items:center;">
+                            <span class="deck-stats" style="color:var(--chip)">${s.chips} Chips</span>
+                            <span class="deck-count">x${count}</span>
+                        </div>
+                    `;
+                    list.appendChild(div);
+                }
+            });
+            document.getElementById('deck-overlay').style.display = 'flex';
+        }
+
+        function openRules() {
+            document.getElementById('rules-overlay').style.display = 'flex';
+        }
+
+        function updateUI() {
+            document.getElementById('ui-current-score').innerText = STATE.score;
+            document.getElementById('ui-target').innerText = STATE.target;
+            document.getElementById('ui-money').innerText = "$" + STATE.money;
+            document.getElementById('ui-spins').innerText = STATE.spinsLeft;
+            
+            const scoreVal = document.getElementById('ui-current-score');
+            if(STATE.score >= STATE.target) scoreVal.classList.add('safe');
+            else scoreVal.classList.remove('safe');
+        }
+
+        function renderRelics() {
+            const c = document.getElementById('relic-container');
+            c.innerHTML = '';
+            STATE.inventory.forEach(r => {
+                c.innerHTML += `<div class="relic" data-desc="${r.desc}">${r.icon}</div>`;
+            });
+            let slotsLeft = STATE.maxRelics - STATE.inventory.length;
+            for(let i=0; i<slotsLeft; i++) {
+                c.innerHTML += `<div class="relic empty">?</div>`;
+            }
+        }
+
+        window.onresize = () => { if(STATE.showLines) drawGuideLines(); else document.getElementById('payline-layer').innerHTML = ""; }
+
+    </script>
+</body>
+</html>
